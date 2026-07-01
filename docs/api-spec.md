@@ -44,22 +44,31 @@ Error:
 ## Vendors
 
 - `GET /vendors/dashboard`: vendor dashboard summary.
-- Future: onboarding read/write, contacts, capabilities, case studies, references, submit verification.
+- `PATCH /vendors/profile`: update vendor profile fields used by onboarding and trust profiles.
+- `POST /vendors/submit`: submit the active vendor organization for verification.
+- Future: contacts, capabilities, case studies, references, and full wizard step persistence.
 
 ## Buyers
 
 - `GET /buyers/search`: buyer-safe vendor search.
-- Future: filters, vendor trust profile detail, shortlist create/remove, buyer request create/respond.
+- `GET /buyers/shortlists`: list shortlisted vendors for the active buyer organization.
+- `POST /buyers/shortlists`: add a vendor to the active buyer organization's shortlist.
+- `POST /buyers/requests`: request clarification or a buyer-safe document summary from a vendor.
+- Future: vendor trust profile detail, shortlist removal, and vendor response endpoints.
 
 ## Documents
 
 - `GET /documents`: list document metadata for the active organization.
-- Future: create upload, confirm upload, signed preview/download URL, replace document, admin review decision.
+- `POST /documents`: register uploaded document metadata after storage upload.
+- `PATCH /documents/{document_id}/review`: admin document review decision.
+- Future: create upload, confirm upload, signed preview/download URL, and replace document.
 
 ## Verification
 
 - `GET /verification/requests`: list verification requests visible to current role.
-- Future: submit request, review checks, recalculate score, request changes, approve, reject, expire.
+- `PATCH /verification/checks/{check_id}`: update a verification check and awarded score.
+- `PATCH /verification/requests/{request_id}/decision`: mark request under review, request changes, approve, reject, or expire.
+- Future: richer verification detail read model and explicit score recalculation endpoint.
 
 ## Admin
 
@@ -80,4 +89,3 @@ Error:
 
 - `GET /metrics/overview`: admin metrics summary.
 - Future: review SLA, vendor funnel, buyer request volume, billing indicators.
-
