@@ -36,6 +36,9 @@ jobs:
       - name: Build static site
         run: node apps/web/scripts/build-pages.mjs
 
+      - name: Static E2E smoke test
+        run: node apps/web/scripts/e2e-static.mjs
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

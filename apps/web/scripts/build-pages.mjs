@@ -204,8 +204,9 @@ const html = `<!doctype html>
     };
     function render() {
       const path = location.hash.replace("#", "") || "/";
-      document.getElementById("app").innerHTML = (pages[path] || pages["/"])();
-      document.title = path === "/" ? "TRUSTPASS" : "TRUSTPASS - " + path.slice(1);
+      const page = pages[path] ? path : "/";
+      document.getElementById("app").innerHTML = pages[page]();
+      document.title = page === "/" ? "TRUSTPASS" : "TRUSTPASS - " + page.slice(1);
     }
     addEventListener("hashchange", render);
     render();

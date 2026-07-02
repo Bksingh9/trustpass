@@ -10,6 +10,7 @@ node_modules/
 .next/
 out/
 apps/web/pages/
+.playwright-mcp/
 
 # Env and local data
 .env

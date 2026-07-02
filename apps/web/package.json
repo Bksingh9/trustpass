@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:pages": "node scripts/build-pages.mjs",
+    "test:static": "node scripts/e2e-static.mjs",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
