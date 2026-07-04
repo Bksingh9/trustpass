@@ -38,3 +38,26 @@ make api-seed
 ```
 
 The first backend test target is available at `apps/api/tests/test_health.py`.
+
+## End-to-End Proof
+
+TRUSTPASS now has two supported operating modes:
+
+- Public demo: GitHub Pages serves the static TRUSTPASS workflow at `https://bksingh9.github.io/trustpass/`.
+- Full-stack proof: the FastAPI app exposes `/api/v1/demo/*` workflow endpoints that cover vendor renewal, buyer search, shortlisting, buyer requests, admin approval, contact/demo requests, audit-style events, and buyer-safe trust-profile exposure.
+
+Run the backend E2E proof after installing API dependencies:
+
+```bash
+cd apps/api
+pytest
+```
+
+Run the static Pages smoke test:
+
+```bash
+cd apps/web
+npm run test:static
+```
+
+GitHub Actions runs both checks on pushes and pull requests.

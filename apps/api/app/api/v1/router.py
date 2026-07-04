@@ -7,6 +7,7 @@ from app.api.v1.routes import (
     auth,
     billing,
     buyers,
+    demo,
     documents,
     health,
     metrics,
@@ -28,4 +29,4 @@ api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
 api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
-
+api_router.include_router(demo.router, prefix="/demo", tags=["demo"])

@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import require_context_organization, require_context_user
+from app.api.v1.deps import require_context_organization
 from app.core.security import UserContext, require_roles
 from app.db.session import get_db
 from app.schemas.common import DataResponse
