@@ -1,4 +1,4 @@
-name: Deploy TRUSTPASS Pages
+name: Build TRUSTPASS Pages
 
 on:
   push:
@@ -7,26 +7,20 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -39,11 +33,32 @@ jobs:
       - name: Static E2E smoke test
         run: node apps/web/scripts/e2e-static.mjs
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: apps/web/pages
+      - name: Publish gh-pages branch
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_dir="$(mktemp -d)"
+          cp -R apps/web/pages/. "$deploy_dir/"
 
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages || true
+
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git switch --detach origin/gh-pages
+          else
+            git switch --orphan gh-pages
+          fi
+
+          git rm -r --ignore-unmatch .
+          cp -R "$deploy_dir"/. .
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No Pages changes to publish."
+            exit 0
+          fi
+
+          git commit -m "Deploy GitHub Pages for ${GITHUB_SHA}"
+          git push origin HEAD:gh-pages
