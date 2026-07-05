@@ -80,8 +80,9 @@ public HTTPS API and a durable database. The preferred no-Cloudflare path is:
 - Bootstrap: `TRUSTPASS_SEED_ON_START=true` runs migrations plus realistic
   verification seed records so the deployed E2E can authenticate deterministic
   buyer, vendor, and admin contexts, then create fresh live records.
-- Verification: set repository variable `TRUSTPASS_API_BASE_URL` to the deployed
-  API URL and run `.github/workflows/verify-deployed-api.yml`.
+- Verification: `.github/workflows/verify-deployed-api.yml` targets
+  `https://trustpass-api.onrender.com` by default. Set repository variable
+  `TRUSTPASS_API_BASE_URL` only when replacing that Render URL.
 
 This proof uses production routes, not `/api/v1/demo/*`, and verifies
 health/readiness, buyer-safe search, shortlist persistence, buyer request

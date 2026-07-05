@@ -25,13 +25,14 @@ jobs:
     env:
       INPUT_API_BASE_URL: ${{ github.event.inputs.api_base_url || '' }}
       TRUSTPASS_API_BASE_URL: ${{ vars.TRUSTPASS_API_BASE_URL || '' }}
+      DEFAULT_TRUSTPASS_API_BASE_URL: https://trustpass-api.onrender.com
     steps:
       - name: Check API URL
         id: check
         shell: bash
         run: |
           set -euo pipefail
-          api_base_url="${INPUT_API_BASE_URL:-$TRUSTPASS_API_BASE_URL}"
+          api_base_url="${INPUT_API_BASE_URL:-${TRUSTPASS_API_BASE_URL:-$DEFAULT_TRUSTPASS_API_BASE_URL}}"
           if [[ -n "$api_base_url" ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             echo "api_base_url=$api_base_url" >> "$GITHUB_OUTPUT"
