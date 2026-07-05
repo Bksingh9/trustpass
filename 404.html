@@ -200,6 +200,8 @@
         documents: [],
         buyer_requests: [],
         verification_decisions: [],
+        trust_score_snapshots: [],
+        notifications: [],
         audit_events: [],
         request_logs: []
       },
@@ -239,7 +241,9 @@
         ["Vendors", state.data.vendors.length],
         ["Buyers", state.data.buyers.length],
         ["Documents", state.data.documents.length],
-        ["Requests", state.data.buyer_requests.length]
+        ["Requests", state.data.buyer_requests.length],
+        ["Score history", state.data.trust_score_snapshots.length],
+        ["Notifications", state.data.notifications.length]
       ];
     }
     async function refreshLiveData() {
@@ -254,7 +258,7 @@
         state.health = await fetchJson("/api/health");
         state.readiness = await fetchJson("/api/readiness");
         const current = await fetchJson("/api/trustpass");
-        state.data = current.data;
+        state.data = Object.assign({}, state.data, current.data || {});
       } catch (error) {
         state.error = error.message;
       } finally {
@@ -267,7 +271,7 @@
         method: "POST",
         body: JSON.stringify(Object.assign({ action: action }, payload))
       });
-      state.data = body.data;
+      state.data = Object.assign({}, state.data, body.data || {});
       render();
     }
     function statusBadge() {
@@ -303,6 +307,18 @@
         return '<tr><td><strong>' + escapeHtml(human(event.action)) + '</strong></td><td>' + escapeHtml(event.entity_type) + '</td><td>' + escapeHtml(event.request_id || "") + '</td><td>' + escapeHtml(event.summary) + '</td></tr>';
       }).join("");
     }
+    function scoreRows() {
+      if (!state.data.trust_score_snapshots.length) return emptyRow(4, state.apiBaseUrl ? "No live score history yet." : "Connect a live API to view score history.");
+      return state.data.trust_score_snapshots.slice(0, 25).map(function (snapshot) {
+        return '<tr><td><strong>' + escapeHtml(snapshot.vendor_name) + '</strong></td><td>' + escapeHtml(snapshot.score) + '</td><td>' + escapeHtml(human(snapshot.status)) + '</td><td>' + escapeHtml(snapshot.buyer_safe_summary || snapshot.reason || "") + '</td></tr>';
+      }).join("");
+    }
+    function notificationRows() {
+      if (!state.data.notifications.length) return emptyRow(4, state.apiBaseUrl ? "No live notifications yet." : "Connect a live API to view notifications.");
+      return state.data.notifications.slice(0, 25).map(function (notification) {
+        return '<tr><td><strong>' + escapeHtml(notification.title) + '</strong></td><td>' + escapeHtml(notification.organization_name || "") + '</td><td>' + escapeHtml(notification.request_id || "") + '</td><td>' + escapeHtml(notification.body || "") + '</td></tr>';
+      }).join("");
+    }
     function shellIntro() {
       return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page no longer ships fake vendor records. Connect it to the deployed TRUSTPASS Worker API to read and write live D1-backed data.</p>' + statusBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
     }
@@ -316,7 +332,7 @@
       return '<main><div class="eyebrow">Buyer workflows</div><h1>Requests</h1><section class="panel"><div class="panel-head"><h2>Buyer Requests</h2></div><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Buyer</th><th>Vendor</th><th>Status</th></tr></thead><tbody>' + requestRows() + '</tbody></table></div></section></main>';
     }
     function logsPage() {
-      return '<main><div class="eyebrow">Operational proof</div><h1>Logs</h1><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Request Logs</h2></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Status</th><th>ID</th><th>Time</th></tr></thead><tbody>' + logRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Audit Events</h2></div><div class="table-wrap"><table><thead><tr><th>Action</th><th>Entity</th><th>Request ID</th><th>Summary</th></tr></thead><tbody>' + auditRows() + '</tbody></table></div></div></section></main>';
+      return '<main><div class="eyebrow">Operational proof</div><h1>Logs</h1><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Request Logs</h2></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Status</th><th>ID</th><th>Time</th></tr></thead><tbody>' + logRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Audit Events</h2></div><div class="table-wrap"><table><thead><tr><th>Action</th><th>Entity</th><th>Request ID</th><th>Summary</th></tr></thead><tbody>' + auditRows() + '</tbody></table></div></div></section><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Trust Score History</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Score</th><th>Status</th><th>Summary</th></tr></thead><tbody>' + scoreRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Notifications</h2></div><div class="table-wrap"><table><thead><tr><th>Title</th><th>Organization</th><th>Request ID</th><th>Body</th></tr></thead><tbody>' + notificationRows() + '</tbody></table></div></div></section></main>';
     }
     function connectPage() {
       return '<main><div class="eyebrow">Configuration</div><h1>Connect Live API</h1><section class="panel pad" style="max-width: 780px"><p>Paste the deployed TRUSTPASS Worker URL. This page will call /api/health, /api/readiness, and /api/trustpass from that host.</p><form id="api-form" class="form-grid"><label class="span-2">Live API base URL<input name="api_base_url" required value="' + escapeHtml(state.apiDraft || "") + '" placeholder="https://your-live-trustpass-worker.example" /></label><div class="span-2 actions"><button class="button">Save and test</button><button class="button secondary" type="button" data-action="clear-api">Clear</button></div></form></section></main>';
