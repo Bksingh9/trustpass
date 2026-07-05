@@ -83,3 +83,14 @@
 4. Confirm the home screen shows `API connected`.
 5. Use the UI to submit renewal, shortlist, request, approve, and submit a demo request.
 6. Confirm `/api/v1/demo/state` reflects `submitted`, one shortlist, one buyer request, one demo request, approved review, and audit events.
+
+## Worker/D1 Live Contract
+
+1. Run `npm run e2e:live` from `apps/live` against the deployed Worker URL.
+2. Confirm `/api/health` returns `service: trustpass-live`, `runtime: sites-worker-d1`, and `demo_data_enabled: false`.
+3. Confirm `/api/readiness` reports D1 connected with no missing tables.
+4. Confirm the E2E creates a vendor, buyer, document, buyer request, and verification decision.
+5. Confirm buyer requests are linked to buyer organization IDs, not free-text-only buyers.
+6. Confirm `/api/operational-proof` reports D1 counts, request logs, audit events, trust score snapshots, and notifications.
+7. Confirm `TRUSTPASS_LIVE_BASE_URL` is a deployed HTTPS Worker URL, not GitHub Pages or localhost.
+8. Confirm the public gateway verifier passes and keeps `https://bksingh9.github.io/trustpass/api/health` as a static `404`.

@@ -24,6 +24,7 @@ const requiredSnippets = [
   "/api/health",
   "/api/readiness",
   "/api/trustpass",
+  "/api/operational-proof",
   "Request Logs",
   "Audit Events",
   "Trust Score History",
@@ -174,6 +175,23 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
     readiness: liveReadiness.body.status,
     d1Connected: liveReadiness.body.d1_connected,
     missingTables: liveReadiness.body.missing_tables,
+  };
+
+  const operationalProof = await fetchJson(urlFor(expectedLiveBaseUrl, "api/operational-proof"));
+  assert(operationalProof.body?.service === "trustpass-live", "operational proof did not identify trustpass-live");
+  assert(operationalProof.body?.runtime === "sites-worker-d1", "operational proof did not identify Worker/D1");
+  assert(operationalProof.body?.d1_connected === true, "operational proof does not see D1");
+  assert(operationalProof.body?.demo_data_enabled === false, "operational proof reports demo data enabled");
+  assert(
+    Array.isArray(operationalProof.body?.missing_tables) && operationalProof.body.missing_tables.length === 0,
+    "operational proof has missing tables",
+  );
+  proof.checks.push("live_operational_proof");
+  proof.operationalProof = {
+    status: operationalProof.response.status,
+    requestId: operationalProof.response.headers.get("x-request-id"),
+    counts: operationalProof.body.counts,
+    invariants: operationalProof.body.invariants,
   };
 }
 

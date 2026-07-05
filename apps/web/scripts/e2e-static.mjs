@@ -23,6 +23,7 @@ const requiredSnippets = [
   "/api/health",
   "/api/readiness",
   "/api/trustpass",
+  "/api/operational-proof",
   "Create Vendor",
   "Vendor Trust Profiles",
   "Request Logs",

@@ -82,7 +82,9 @@ database. It must point at the deployed Worker/D1 API through
 The same-origin Pages path `https://bksingh9.github.io/trustpass/api/health`
 must remain a static `404`; the real live API is the separate Cloudflare Worker
 URL verified by `.github/workflows/live-app.yml` and
-`.github/workflows/deploy-live-worker.yml`.
+`.github/workflows/deploy-live-worker.yml`. The live Worker also exposes
+`/api/operational-proof` for D1 counts, recent request logs, audit events, score
+snapshots, and notifications.
 
 ## Real-Data API Verification
 

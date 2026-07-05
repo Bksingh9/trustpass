@@ -62,6 +62,7 @@ The deployed proof checks:
 
 - `GET /api/health`
 - `GET /api/readiness`
+- `GET /api/operational-proof`
 - health identity `service: trustpass-live` and `runtime: sites-worker-d1`
 - CORS preflight for the public Pages origin
 - root app renders the live operations UI
@@ -70,7 +71,8 @@ The deployed proof checks:
 - trust score snapshot persistence from verification decisions
 - notification persistence for buyer requests and verification decisions
 - final persistence read
-- matching `x-request-id`, `request_logs`, and `audit_events`
+- matching `x-request-id`, `request_logs`, `audit_events`, operational counts,
+  recent score snapshots, and recent notifications
 
 The deploy workflow uploads a `trustpass-live-deployment-proof` artifact with a
 machine-readable JSON summary of the live E2E run and the Wrangler deploy log.

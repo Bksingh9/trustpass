@@ -345,6 +345,41 @@ summary.evidence.finalStateCounts = {
 };
 summary.checks.push("final_persistence_read");
 
+const operationalProof = await request("api/operational-proof", {
+  headers: {
+    "x-request-id": `${runId}-operational-proof`,
+  },
+});
+assertRequestId(operationalProof, `${runId}-operational-proof`);
+assert(operationalProof.body?.service === "trustpass-live", "operational proof did not identify trustpass-live");
+assert(operationalProof.body?.runtime === "sites-worker-d1", "operational proof did not identify Worker/D1 runtime");
+assert(operationalProof.body?.d1_connected === true, "operational proof does not see D1");
+assert(operationalProof.body?.demo_data_enabled === false, "operational proof reports demo data enabled");
+assert(
+  Array.isArray(operationalProof.body?.missing_tables) && operationalProof.body.missing_tables.length === 0,
+  "operational proof has missing tables",
+);
+assert(operationalProof.body?.counts?.organizations >= 2, "operational proof lost organization count");
+assert(operationalProof.body?.counts?.documents >= 1, "operational proof lost document count");
+assert(operationalProof.body?.counts?.buyer_requests >= 1, "operational proof lost buyer request count");
+assert(operationalProof.body?.counts?.trust_score_snapshots >= 1, "operational proof lost score snapshot count");
+assert(operationalProof.body?.counts?.notifications >= 2, "operational proof lost notification count");
+assert(operationalProof.body?.invariants?.has_request_logs === true, "operational proof has no request logs");
+assert(operationalProof.body?.invariants?.has_audit_events === true, "operational proof has no audit events");
+assert(operationalProof.body?.invariants?.has_score_snapshots === true, "operational proof has no score snapshots");
+assert(operationalProof.body?.invariants?.has_notifications === true, "operational proof has no notifications");
+assert(
+  operationalProof.body?.recent?.request_logs?.some((log) => log.request_id === `${runId}-operational-proof`),
+  "operational proof did not log its own request",
+);
+summary.requestIds.operationalProof = `${runId}-operational-proof`;
+summary.evidence.operationalProof = {
+  status: operationalProof.body.status,
+  counts: operationalProof.body.counts,
+  invariants: operationalProof.body.invariants,
+};
+summary.checks.push("operational_proof");
+
 summary.completedAt = new Date().toISOString();
 summary.status = "passed";
 
