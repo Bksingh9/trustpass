@@ -77,7 +77,7 @@
 
 ## No-Cloudflare Render Live Contract
 
-1. Deploy `render.yaml` with the `trustpass-api` service and `trustpass-postgres` database.
+1. Deploy `render.yaml` with the `trustpass-api` service and `trustpass-postgres` database on explicit free Render plans.
 2. Confirm production env has `ENABLE_DEMO_ROUTES=false` and `TRUSTPASS_SEED_ON_START=true` for bootstrap verification.
 3. Set repository variable `TRUSTPASS_API_BASE_URL` to the deployed API URL.
 4. Run `.github/workflows/verify-deployed-api.yml` or `python apps/api/scripts/e2e_deployed_real_api.py --base-url <api-url>`.

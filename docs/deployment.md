@@ -72,8 +72,10 @@ make api-seed
 Cloudflare is not required for TRUSTPASS. The required live components are a
 public HTTPS API and a durable database. The preferred no-Cloudflare path is:
 
-- API host: Render web service from `apps/api/Dockerfile`.
-- Database: Render managed PostgreSQL from `render.yaml`.
+- API host: Render web service from `apps/api/Dockerfile` on the explicit `free`
+  instance plan.
+- Database: Render managed PostgreSQL from `render.yaml` on the explicit `free`
+  database plan.
 - Demo routes: disabled with `ENABLE_DEMO_ROUTES=false`.
 - Bootstrap: `TRUSTPASS_SEED_ON_START=true` runs migrations plus realistic
   verification seed records so the deployed E2E can authenticate deterministic
