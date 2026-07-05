@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 const args = new Map();
 for (let index = 2; index < process.argv.length; index += 1) {
   const value = process.argv[index];
@@ -16,6 +19,7 @@ const baseUrl = (args.get("base-url") ?? process.env.TRUSTPASS_LIVE_BASE_URL ?? 
   /\/?$/,
   "/",
 );
+const proofOutputPath = args.get("proof-out") ?? process.env.TRUSTPASS_LIVE_PROOF_PATH ?? "";
 const runId = `live-e2e-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random()
   .toString(36)
   .slice(2, 8)}`;
@@ -111,13 +115,18 @@ async function postAction(action, payload, requestId) {
     result.body.data.audit_events.some((event) => event.request_id === requestId),
     `audit event missing for ${requestId}`,
   );
+  summary.requestIds[action] = requestId;
   return result.body.data;
 }
 
 const summary = {
   baseUrl,
   runId,
+  startedAt: new Date().toISOString(),
   checks: [],
+  requestIds: {},
+  entities: {},
+  evidence: {},
 };
 
 const health = await retry(async () => request("api/health"), "TRUSTPASS live health");
@@ -125,6 +134,11 @@ assertRequestId(health);
 assert(health.response.headers.get("access-control-allow-origin") === "*", "health response is missing CORS");
 assert(health.body?.service === "trustpass-live", "health did not identify trustpass-live service");
 assert(health.body?.demo_data_enabled === false, "health reports demo data enabled");
+summary.requestIds.health = health.response.headers.get("x-request-id");
+summary.evidence.health = {
+  service: health.body.service,
+  demoDataEnabled: health.body.demo_data_enabled,
+};
 summary.checks.push("health");
 
 if (process.env.TRUSTPASS_REQUIRE_CORS_PREFLIGHT === "1") {
@@ -158,6 +172,7 @@ assertRequestId(initial);
 assert(initial.response.headers.get("cache-control")?.includes("no-store"), "state response is cacheable");
 assert(initial.body?.data, "state response is missing data");
 assertNoStaticDemo(JSON.stringify(initial.body), "state API");
+summary.requestIds.initialState = initial.response.headers.get("x-request-id");
 summary.checks.push("state_api");
 
 const readiness = await request("api/readiness");
@@ -166,6 +181,12 @@ assert(readiness.body?.status === "ready", `readiness status is ${readiness.body
 assert(readiness.body?.d1_connected === true, "readiness does not see D1");
 assert(readiness.body?.demo_data_enabled === false, "readiness reports demo data enabled");
 assert(Array.isArray(readiness.body?.missing_tables) && readiness.body.missing_tables.length === 0, "readiness has missing tables");
+summary.requestIds.readiness = readiness.response.headers.get("x-request-id");
+summary.evidence.readiness = {
+  status: readiness.body.status,
+  d1Connected: readiness.body.d1_connected,
+  missingTables: readiness.body.missing_tables,
+};
 summary.checks.push("readiness");
 
 const vendorName = `TRUSTPASS Live Vendor ${runId}`;
@@ -186,6 +207,7 @@ let state = await postAction(
 const vendor = findByName(state.vendors, vendorName);
 assert(vendor, "created vendor not found in state");
 summary.vendorId = vendor.id;
+summary.entities.vendor = { id: vendor.id, name: vendorName };
 summary.checks.push("create_vendor");
 
 state = await postAction(
@@ -199,6 +221,7 @@ state = await postAction(
   `${runId}-buyer`,
 );
 assert(findByName(state.buyers, buyerName), "created buyer not found in state");
+summary.entities.buyer = { name: buyerName };
 summary.checks.push("create_buyer");
 
 state = await postAction(
@@ -212,6 +235,7 @@ state = await postAction(
   `${runId}-document`,
 );
 assert(state.documents.some((document) => document.document_name === documentName), "created document not found in state");
+summary.entities.document = { name: documentName };
 summary.checks.push("add_document");
 
 state = await postAction(
@@ -225,6 +249,7 @@ state = await postAction(
   `${runId}-request`,
 );
 assert(state.buyer_requests.some((requestRow) => requestRow.subject === requestSubject), "buyer request not found in state");
+summary.entities.buyerRequest = { subject: requestSubject };
 summary.checks.push("create_buyer_request");
 
 state = await postAction(
@@ -241,6 +266,11 @@ const updatedVendor = state.vendors.find((row) => row.id === vendor.id);
 assert(updatedVendor?.verification_status === "approved", "vendor status was not updated to approved");
 assert(updatedVendor?.trust_score === 94, "vendor trust score was not updated");
 assert(state.verification_decisions.some((decision) => decision.vendor_id === vendor.id || decision.vendor_name === vendorName), "verification decision not found");
+summary.entities.verificationDecision = {
+  vendorId: vendor.id,
+  status: updatedVendor.verification_status,
+  trustScore: updatedVendor.trust_score,
+};
 summary.checks.push("decide_verification");
 
 const finalState = await request("api/trustpass", {
@@ -258,6 +288,24 @@ assert(
   finalState.body.data.request_logs.some((log) => log.request_id === `${runId}-final-read`),
   "final read did not log itself",
 );
+summary.requestIds.finalRead = `${runId}-final-read`;
+summary.evidence.finalStateCounts = {
+  vendors: finalState.body.data.vendors.length,
+  buyers: finalState.body.data.buyers.length,
+  documents: finalState.body.data.documents.length,
+  buyerRequests: finalState.body.data.buyer_requests.length,
+  verificationDecisions: finalState.body.data.verification_decisions.length,
+  auditEvents: finalState.body.data.audit_events.length,
+  requestLogs: finalState.body.data.request_logs.length,
+};
 summary.checks.push("final_persistence_read");
+
+summary.completedAt = new Date().toISOString();
+summary.status = "passed";
+
+if (proofOutputPath) {
+  await mkdir(path.dirname(path.resolve(proofOutputPath)), { recursive: true });
+  await writeFile(proofOutputPath, `${JSON.stringify(summary, null, 2)}\n`);
+}
 
 console.log(`TRUSTPASS_LIVE_E2E_OK ${JSON.stringify(summary)}`);

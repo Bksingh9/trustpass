@@ -58,6 +58,12 @@ The deployed proof checks:
 - final persistence read
 - matching `x-request-id`, `request_logs`, and `audit_events`
 
+The deploy workflow uploads a `trustpass-live-deployment-proof` artifact with a
+machine-readable JSON summary of the live E2E run and the Wrangler deploy log.
+The proof includes the resolved base URL, run ID, request IDs, created entity
+IDs/names, final persisted record counts, readiness evidence, and completed
+checks.
+
 After the Worker is live, set repository variable `TRUSTPASS_LIVE_BASE_URL` to
 the same Worker URL. The existing `TRUSTPASS Live App` workflow will then run
 the deployed-live acceptance check on future pushes, and ordinary Pages builds

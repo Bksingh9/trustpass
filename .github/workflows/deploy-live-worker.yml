@@ -97,7 +97,19 @@ jobs:
         run: node scripts/resolve-live-base-url.mjs --deploy-log deploy-output.log
 
       - name: Run deployed live E2E proof
+        env:
+          TRUSTPASS_LIVE_PROOF_PATH: live-e2e-proof.json
         run: npm run e2e:live
+
+      - name: Upload live deployment proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustpass-live-deployment-proof
+          path: |
+            apps/live/live-e2e-proof.json
+            apps/live/deploy-output.log
+          if-no-files-found: warn
 
       - name: Build public gateway for deployed API
         working-directory: .

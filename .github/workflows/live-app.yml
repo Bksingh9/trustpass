@@ -42,7 +42,17 @@ jobs:
           echo "$!" > live-dev.pid
 
       - name: Run live D1 E2E proof
+        env:
+          TRUSTPASS_LIVE_PROOF_PATH: live-e2e-proof-local.json
         run: npm run e2e:live -- --base-url http://localhost:4180/
+
+      - name: Upload local D1 proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustpass-local-d1-live-proof
+          path: apps/live/live-e2e-proof-local.json
+          if-no-files-found: warn
 
       - name: Show local Worker logs
         if: always()
@@ -74,4 +84,13 @@ jobs:
         env:
           TRUSTPASS_LIVE_BASE_URL: ${{ vars.TRUSTPASS_LIVE_BASE_URL }}
           TRUSTPASS_REQUIRE_CORS_PREFLIGHT: "1"
+          TRUSTPASS_LIVE_PROOF_PATH: live-e2e-proof-deployed.json
         run: npm run e2e:live
+
+      - name: Upload deployed live proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustpass-deployed-live-proof
+          path: apps/live/live-e2e-proof-deployed.json
+          if-no-files-found: warn
