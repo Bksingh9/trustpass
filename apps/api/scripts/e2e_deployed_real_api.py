@@ -10,23 +10,7 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-from uuid import NAMESPACE_URL, uuid4, uuid5
-
-
-def stable_seed_id(kind: str, key: str) -> str:
-    return str(uuid5(NAMESPACE_URL, f"trustpass:seed:{kind}:{key}"))
-
-
-IDS = {
-    "buyer_org": stable_seed_id("organization", "brightline-procurement"),
-    "atlas_org": stable_seed_id("organization", "atlas-freight-partners"),
-    "clearpath_org": stable_seed_id("organization", "clearpath-advisory"),
-    "internal_org": stable_seed_id("organization", "trustpass-ops"),
-    "buyer_user": stable_seed_id("user", "seed-buyer-1"),
-    "clearpath_user": stable_seed_id("user", "seed-vendor-3"),
-    "admin_user": stable_seed_id("user", "seed-admin-2"),
-    "category_compliance_document_type": stable_seed_id("document_type", "category_compliance"),
-}
+from uuid import uuid4
 
 
 def normalize_base_url(value: str) -> str:
@@ -89,7 +73,9 @@ def request_json(
     return status, json.loads(response_body), response_headers
 
 
-def context_headers(*, auth_subject_id: str, user_id: str, organization_id: str, roles: str, request_id: str) -> dict[str, str]:
+def context_headers(
+    *, auth_subject_id: str, user_id: str, organization_id: str, roles: str, request_id: str
+) -> dict[str, str]:
     return {
         "authorization": f"Bearer {auth_subject_id}",
         "x-trustpass-user-id": user_id,
@@ -100,7 +86,37 @@ def context_headers(*, auth_subject_id: str, user_id: str, organization_id: str,
 
 
 def assert_request_id(headers: dict[str, str], request_id: str) -> None:
-    assert_condition(headers.get("x-request-id") == request_id, f"missing or mismatched x-request-id for {request_id}")
+    assert_condition(
+        headers.get("x-request-id") == request_id,
+        f"missing or mismatched x-request-id for {request_id}",
+    )
+
+
+def resolve_seed_context(base_url: str, run_id: str) -> tuple[dict[str, str], dict[str, str]]:
+    request_id = f"{run_id}-seed-context"
+    _, response, headers = request_json(
+        base_url,
+        "GET",
+        "/admin/seed-context",
+        headers={
+            "authorization": "Bearer seed-admin-2",
+            "x-trustpass-roles": "super_admin",
+            "x-request-id": request_id,
+        },
+    )
+    assert_request_id(headers, request_id)
+    data = response["data"]
+    ids = {
+        "buyer_org": data["organizations"]["brightline-procurement"],
+        "atlas_org": data["organizations"]["atlas-freight-partners"],
+        "clearpath_org": data["organizations"]["clearpath-advisory"],
+        "internal_org": data["organizations"]["trustpass-ops"],
+        "buyer_user": data["users"]["seed-buyer-1"],
+        "clearpath_user": data["users"]["seed-vendor-3"],
+        "admin_user": data["users"]["seed-admin-2"],
+        "category_compliance_document_type": data["document_types"]["category_compliance"],
+    }
+    return ids, headers
 
 
 def main() -> None:
@@ -134,24 +150,28 @@ def main() -> None:
     request_json(base_url, "GET", "/demo/health", expected_statuses={404})
     proof["checks"].append("demo_routes_disabled")
 
+    ids, seed_context_headers = resolve_seed_context(base_url, run_id)
+    proof["requestIds"]["seedContext"] = seed_context_headers.get("x-request-id")
+    proof["checks"].append("seed_context")
+
     buyer_headers = context_headers(
         auth_subject_id="seed-buyer-1",
-        user_id=IDS["buyer_user"],
-        organization_id=IDS["buyer_org"],
+        user_id=ids["buyer_user"],
+        organization_id=ids["buyer_org"],
         roles="buyer",
         request_id=f"{run_id}-buyer",
     )
     vendor_headers = context_headers(
         auth_subject_id="seed-vendor-3",
-        user_id=IDS["clearpath_user"],
-        organization_id=IDS["clearpath_org"],
+        user_id=ids["clearpath_user"],
+        organization_id=ids["clearpath_org"],
         roles="vendor",
         request_id=f"{run_id}-vendor",
     )
     admin_headers = context_headers(
         auth_subject_id="seed-admin-2",
-        user_id=IDS["admin_user"],
-        organization_id=IDS["internal_org"],
+        user_id=ids["admin_user"],
+        organization_id=ids["internal_org"],
         roles="super_admin",
         request_id=f"{run_id}-admin",
     )
@@ -164,7 +184,10 @@ def main() -> None:
         query={"q": "Atlas"},
     )
     vendors = search["data"]["vendors"]
-    assert_condition(vendors and vendors[0]["organization_id"] == IDS["atlas_org"], "buyer search did not return Atlas")
+    assert_condition(
+        vendors and vendors[0]["organization_id"] == ids["atlas_org"],
+        "buyer search did not return Atlas",
+    )
     assert_condition("private_review_notes" not in vendors[0], "buyer search leaked private review notes")
     assert_request_id(search_headers, f"{run_id}-search")
     proof["checks"].append("buyer_safe_search")
@@ -175,7 +198,7 @@ def main() -> None:
         "/buyers/shortlists",
         headers=buyer_headers | {"x-request-id": f"{run_id}-shortlist"},
         payload={
-            "vendor_organization_id": IDS["clearpath_org"],
+            "vendor_organization_id": ids["clearpath_org"],
             "notes": f"Deployed real-data E2E shortlist {run_id}",
         },
     )
@@ -189,7 +212,7 @@ def main() -> None:
         "/buyers/requests",
         headers=buyer_headers | {"x-request-id": f"{run_id}-buyer-request"},
         payload={
-            "vendor_organization_id": IDS["atlas_org"],
+            "vendor_organization_id": ids["atlas_org"],
             "subject": f"Deployed real-data request {run_id}",
             "message": "Please share the current buyer-safe verification summary.",
         },
@@ -204,7 +227,7 @@ def main() -> None:
         "/documents/",
         headers=vendor_headers | {"x-request-id": f"{run_id}-document"},
         payload={
-            "document_type_id": IDS["category_compliance_document_type"],
+            "document_type_id": ids["category_compliance_document_type"],
             "file_name": f"clearpath-{run_id}.pdf",
             "storage_object_key": f"deployed-real-data/{run_id}.pdf",
             "mime_type": "application/pdf",
@@ -239,7 +262,7 @@ def main() -> None:
         (
             request
             for request in existing_requests["data"]["verification_requests"]
-            if request["organization_id"] == IDS["clearpath_org"]
+            if request["organization_id"] == ids["clearpath_org"]
             and request["status"] in {"submitted", "under_review"}
         ),
         None,
@@ -280,10 +303,13 @@ def main() -> None:
         "GET",
         "/audit/events",
         headers=admin_headers | {"x-request-id": f"{run_id}-audit"},
-        query={"organization_id": IDS["clearpath_org"]},
+        query={"organization_id": ids["clearpath_org"]},
     )
     audit_actions = {event["action"] for event in audit["data"]["events"]}
-    assert_condition({"upload", "review", "submit", "approve"}.issubset(audit_actions), "audit proof is incomplete")
+    assert_condition(
+        {"upload", "review", "submit", "approve"}.issubset(audit_actions),
+        "audit proof is incomplete",
+    )
     assert_request_id(audit_headers, f"{run_id}-audit")
     proof["checks"].append("audit_events")
 
@@ -292,7 +318,7 @@ def main() -> None:
         "GET",
         "/audit/activity",
         headers=admin_headers | {"x-request-id": f"{run_id}-activity"},
-        query={"organization_id": IDS["clearpath_org"]},
+        query={"organization_id": ids["clearpath_org"]},
     )
     activity_actions = {event["action"] for event in activity["data"]["activity"]}
     assert_condition(
@@ -307,7 +333,7 @@ def main() -> None:
     proof["entities"] = {
         "documentId": document_id,
         "verificationRequestId": verification_request_id,
-        "clearpathOrganizationId": IDS["clearpath_org"],
+        "clearpathOrganizationId": ids["clearpath_org"],
     }
 
     if args.proof_out:
