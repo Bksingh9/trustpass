@@ -333,6 +333,12 @@ const html = `<!doctype html>
         return '<tr><td><strong>' + escapeHtml(notification.title) + '</strong></td><td>' + escapeHtml(notification.organization_name || "") + '</td><td>' + escapeHtml(notification.request_id || "") + '</td><td>' + escapeHtml(notification.body || "") + '</td></tr>';
       }).join("");
     }
+    function selectOptions(rows, valueKey, labelKey, emptyLabel) {
+      if (!rows.length) return '<option value="">' + escapeHtml(emptyLabel) + '</option>';
+      return '<option value="">Select a live record</option>' + rows.map(function (row) {
+        return '<option value="' + escapeHtml(row[valueKey]) + '">' + escapeHtml(row[labelKey] || row[valueKey]) + '</option>';
+      }).join("");
+    }
     function shellIntro() {
       return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page no longer ships fake vendor records. Connect it to the deployed TRUSTPASS Worker API to read and write live D1-backed data.</p>' + statusBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
     }
@@ -343,7 +349,10 @@ const html = `<!doctype html>
       return '<main><div class="eyebrow">Live records</div><h1>Vendors</h1><p>Rows below come from the connected live API only.</p><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Vendor Trust Profiles</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Location</th><th>Trust</th><th>Status</th></tr></thead><tbody>' + vendorRows() + '</tbody></table></div></div><form id="vendor-form" class="panel pad"><h2>Create Vendor</h2><p>Create a real record in the connected live API.</p><div class="form-grid"><label>Name<input name="name" required /></label><label>Category<input name="category" /></label><label>Location<input name="location" /></label><label>Email<input name="contact_email" type="email" /></label><div class="span-2 actions"><button class="button" ' + (state.apiBaseUrl ? "" : "disabled") + '>Create live vendor</button></div></div></form></section></main>';
     }
     function requestsPage() {
-      return '<main><div class="eyebrow">Buyer workflows</div><h1>Requests</h1><section class="panel"><div class="panel-head"><h2>Buyer Requests</h2></div><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Buyer</th><th>Vendor</th><th>Status</th></tr></thead><tbody>' + requestRows() + '</tbody></table></div></section></main>';
+      const disabled = state.apiBaseUrl ? "" : "disabled";
+      const vendorOptions = selectOptions(state.data.vendors, "id", "name", "Create a vendor first");
+      const buyerOptions = selectOptions(state.data.buyers, "id", "name", "Create a buyer first");
+      return '<main><div class="eyebrow">Buyer workflows</div><h1>Requests</h1><section class="panel"><div class="panel-head"><h2>Buyer Requests</h2></div><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Buyer</th><th>Vendor</th><th>Status</th></tr></thead><tbody>' + requestRows() + '</tbody></table></div></section><section class="grid-2"><form id="buyer-form" class="panel pad"><h2>Create Buyer</h2><p>Create a real buyer organization in the connected live API.</p><div class="form-grid"><label>Name<input name="name" required /></label><label>Email<input name="contact_email" type="email" /></label><label class="span-2">Location<input name="location" /></label><div class="span-2 actions"><button class="button" ' + disabled + '>Create live buyer</button></div></div></form><form id="document-form" class="panel pad"><h2>Add Document Metadata</h2><p>Attach file metadata to a live vendor without storing raw files in the page.</p><div class="form-grid"><label class="span-2">Vendor<select name="vendor_id" required>' + vendorOptions + '</select></label><label>Document name<input name="name" required placeholder="Insurance certificate" /></label><label>Status<select name="status"><option value="submitted">Submitted</option><option value="under_review">Under review</option><option value="approved">Approved</option><option value="changes_requested">Changes requested</option><option value="rejected">Rejected</option><option value="expired">Expired</option></select></label><label>Expiry date<input name="expiry_date" type="date" /></label><div class="span-2 actions"><button class="button" ' + disabled + '>Add live document</button></div></div></form></section><section class="grid-2"><form id="buyer-request-form" class="panel pad"><h2>Create Buyer Request</h2><p>Open a real buyer-to-vendor request and notification trail.</p><div class="form-grid"><label>Buyer<select name="buyer_id" required>' + buyerOptions + '</select></label><label>Vendor<select name="vendor_id" required>' + vendorOptions + '</select></label><label class="span-2">Subject<input name="subject" required placeholder="Compliance review request" /></label><label class="span-2">Message<textarea name="message" rows="4"></textarea></label><div class="span-2 actions"><button class="button" ' + disabled + '>Create live request</button></div></div></form><form id="decision-form" class="panel pad"><h2>Record Verification Decision</h2><p>Write the review result, score snapshot, audit event, and notification.</p><div class="form-grid"><label>Vendor<select name="vendor_id" required>' + vendorOptions + '</select></label><label>Status<select name="status"><option value="approved">Approved</option><option value="changes_requested">Changes requested</option><option value="rejected">Rejected</option><option value="expired">Expired</option></select></label><label>Trust score<input name="trust_score" type="number" min="0" max="100" value="82" /></label><label class="span-2">Notes<textarea name="notes" rows="4">Verified from public gateway workflow.</textarea></label><div class="span-2 actions"><button class="button" ' + disabled + '>Record live decision</button></div></div></form></section></main>';
     }
     function logsPage() {
       return '<main><div class="eyebrow">Operational proof</div><h1>Logs</h1><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Request Logs</h2></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Status</th><th>ID</th><th>Time</th></tr></thead><tbody>' + logRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Audit Events</h2></div><div class="table-wrap"><table><thead><tr><th>Action</th><th>Entity</th><th>Request ID</th><th>Summary</th></tr></thead><tbody>' + auditRows() + '</tbody></table></div></div></section><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Trust Score History</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Score</th><th>Status</th><th>Summary</th></tr></thead><tbody>' + scoreRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Notifications</h2></div><div class="table-wrap"><table><thead><tr><th>Title</th><th>Organization</th><th>Request ID</th><th>Body</th></tr></thead><tbody>' + notificationRows() + '</tbody></table></div></div></section></main>';
@@ -404,6 +413,30 @@ const html = `<!doctype html>
         event.preventDefault();
         const form = Object.fromEntries(new FormData(event.target).entries());
         await postTrustpass("create_vendor", form);
+        event.target.reset();
+      }
+      if (event.target.id === "buyer-form") {
+        event.preventDefault();
+        const form = Object.fromEntries(new FormData(event.target).entries());
+        await postTrustpass("create_buyer", form);
+        event.target.reset();
+      }
+      if (event.target.id === "document-form") {
+        event.preventDefault();
+        const form = Object.fromEntries(new FormData(event.target).entries());
+        await postTrustpass("add_document", form);
+        event.target.reset();
+      }
+      if (event.target.id === "buyer-request-form") {
+        event.preventDefault();
+        const form = Object.fromEntries(new FormData(event.target).entries());
+        await postTrustpass("create_buyer_request", form);
+        event.target.reset();
+      }
+      if (event.target.id === "decision-form") {
+        event.preventDefault();
+        const form = Object.fromEntries(new FormData(event.target).entries());
+        await postTrustpass("record_verification_decision", form);
         event.target.reset();
       }
     });
