@@ -14,6 +14,13 @@ Add these repository secrets:
 The token must be allowed to deploy Workers and apply D1 migrations for the
 target account.
 
+The deploy workflow runs automatically on `main` pushes that touch the live
+Worker, the public gateway, or the deploy workflow itself. It first checks for
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; if either secret is missing,
+automatic deploys are skipped with a step summary instead of pretending the site
+is live. Manual `workflow_dispatch` runs fail fast when those secrets are
+missing.
+
 Before attempting deployment, the workflow verifies the Cloudflare API token and
 checks D1 account access so missing or under-scoped secrets fail before database
 creation, migrations, or Worker upload.
