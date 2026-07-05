@@ -66,7 +66,6 @@ jobs:
 
   deployed-live-e2e:
     name: Deployed live E2E
-    if: ${{ vars.TRUSTPASS_LIVE_BASE_URL != '' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -79,6 +78,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Require deployed Worker API URL
+        env:
+          TRUSTPASS_LIVE_BASE_URL: ${{ vars.TRUSTPASS_LIVE_BASE_URL }}
+        run: node scripts/require-live-base-url.mjs
 
       - name: Verify deployed live API and data path
         env:

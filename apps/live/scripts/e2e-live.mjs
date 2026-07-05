@@ -133,10 +133,12 @@ const health = await retry(async () => request("api/health"), "TRUSTPASS live he
 assertRequestId(health);
 assert(health.response.headers.get("access-control-allow-origin") === "*", "health response is missing CORS");
 assert(health.body?.service === "trustpass-live", "health did not identify trustpass-live service");
+assert(health.body?.runtime === "sites-worker-d1", "health did not identify the Worker/D1 runtime");
 assert(health.body?.demo_data_enabled === false, "health reports demo data enabled");
 summary.requestIds.health = health.response.headers.get("x-request-id");
 summary.evidence.health = {
   service: health.body.service,
+  runtime: health.body.runtime,
   demoDataEnabled: health.body.demo_data_enabled,
 };
 summary.checks.push("health");
