@@ -255,6 +255,12 @@ const buyerRequest = state.buyer_requests.find((requestRow) => requestRow.subjec
 assert(buyerRequest, "buyer request not found in state");
 assert(buyerRequest.buyer_id === buyer.id, "buyer request is not linked to created buyer organization");
 assert(buyerRequest.buyer_name === buyerName, "buyer request did not expose buyer organization name");
+assert(
+  state.notifications.some(
+    (notification) => notification.request_id === `${runId}-request` && notification.type === "buyer_request",
+  ),
+  "buyer request notification was not persisted",
+);
 summary.entities.buyerRequest = { buyerId: buyer.id, subject: requestSubject };
 summary.checks.push("create_buyer_request");
 
@@ -272,10 +278,31 @@ const updatedVendor = state.vendors.find((row) => row.id === vendor.id);
 assert(updatedVendor?.verification_status === "approved", "vendor status was not updated to approved");
 assert(updatedVendor?.trust_score === 94, "vendor trust score was not updated");
 assert(state.verification_decisions.some((decision) => decision.vendor_id === vendor.id || decision.vendor_name === vendorName), "verification decision not found");
+assert(
+  state.trust_score_snapshots.some(
+    (snapshot) =>
+      snapshot.vendor_id === vendor.id &&
+      snapshot.score === 94 &&
+      snapshot.evidence_request_id === `${runId}-decision`,
+  ),
+  "trust score snapshot was not persisted for decision",
+);
+assert(
+  state.notifications.some(
+    (notification) =>
+      notification.request_id === `${runId}-decision` && notification.type === "verification_decision",
+  ),
+  "verification decision notification was not persisted",
+);
 summary.entities.verificationDecision = {
   vendorId: vendor.id,
   status: updatedVendor.verification_status,
   trustScore: updatedVendor.trust_score,
+};
+summary.entities.trustScoreSnapshot = {
+  vendorId: vendor.id,
+  score: 94,
+  evidenceRequestId: `${runId}-decision`,
 };
 summary.checks.push("decide_verification");
 
@@ -291,6 +318,16 @@ assert(
   "final read lost decision audit event",
 );
 assert(
+  finalState.body.data.trust_score_snapshots.some(
+    (snapshot) => snapshot.evidence_request_id === `${runId}-decision` && snapshot.score === 94,
+  ),
+  "final read lost trust score snapshot",
+);
+assert(
+  finalState.body.data.notifications.some((notification) => notification.request_id === `${runId}-decision`),
+  "final read lost decision notification",
+);
+assert(
   finalState.body.data.request_logs.some((log) => log.request_id === `${runId}-final-read`),
   "final read did not log itself",
 );
@@ -301,6 +338,8 @@ summary.evidence.finalStateCounts = {
   documents: finalState.body.data.documents.length,
   buyerRequests: finalState.body.data.buyer_requests.length,
   verificationDecisions: finalState.body.data.verification_decisions.length,
+  trustScoreSnapshots: finalState.body.data.trust_score_snapshots.length,
+  notifications: finalState.body.data.notifications.length,
   auditEvents: finalState.body.data.audit_events.length,
   requestLogs: finalState.body.data.request_logs.length,
 };

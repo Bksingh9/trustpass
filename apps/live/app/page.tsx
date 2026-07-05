@@ -51,6 +51,28 @@ type Decision = {
   created_at: string;
 };
 
+type ScoreSnapshot = {
+  id: string;
+  vendor_name: string;
+  score: number;
+  status: string;
+  reason: string;
+  buyer_safe_summary: string;
+  evidence_request_id: string;
+  created_at: string;
+};
+
+type Notification = {
+  id: string;
+  organization_name: string;
+  type: string;
+  title: string;
+  body: string;
+  status: string;
+  request_id: string;
+  created_at: string;
+};
+
 type AuditEvent = {
   id: string;
   request_id: string;
@@ -75,6 +97,8 @@ type TrustpassState = {
   documents: DocumentRecord[];
   buyer_requests: BuyerRequest[];
   verification_decisions: Decision[];
+  trust_score_snapshots: ScoreSnapshot[];
+  notifications: Notification[];
   audit_events: AuditEvent[];
   request_logs: RequestLog[];
 };
@@ -85,6 +109,8 @@ const emptyState: TrustpassState = {
   documents: [],
   buyer_requests: [],
   verification_decisions: [],
+  trust_score_snapshots: [],
+  notifications: [],
   audit_events: [],
   request_logs: [],
 };
@@ -179,6 +205,8 @@ export default function Home() {
       ["Documents", state.documents.length],
       ["Requests", state.buyer_requests.length],
       ["Decisions", state.verification_decisions.length],
+      ["Score history", state.trust_score_snapshots.length],
+      ["Notifications", state.notifications.length],
       ["Audit events", state.audit_events.length],
     ],
     [state],
@@ -204,7 +232,7 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-4 px-6 py-6 sm:grid-cols-2 lg:grid-cols-6">
+      <section className="mx-auto grid max-w-7xl gap-4 px-6 py-6 sm:grid-cols-2 lg:grid-cols-4">
         {totals.map(([label, value]) => (
           <div key={label} className="rounded-md border border-[#d9e0ea] bg-white p-4">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#657084]">{label}</p>
@@ -360,6 +388,29 @@ export default function Home() {
                   title={`${decision.vendor_name} - ${human(decision.status)}`}
                   meta={decision.notes || "No reviewer notes"}
                   value={String(decision.trust_score)}
+                />
+              ))}
+            </Panel>
+            <Panel title="Trust Score History" empty="No trust score snapshots yet.">
+              {state.trust_score_snapshots.map((snapshot) => (
+                <Row
+                  key={snapshot.id}
+                  title={`${snapshot.vendor_name} - ${snapshot.score}`}
+                  meta={snapshot.buyer_safe_summary || snapshot.reason}
+                  value={human(snapshot.status)}
+                />
+              ))}
+            </Panel>
+          </section>
+
+          <section className="grid gap-5 lg:grid-cols-2">
+            <Panel title="Notifications" empty="No notifications yet.">
+              {state.notifications.map((notification) => (
+                <Row
+                  key={notification.id}
+                  title={notification.title}
+                  meta={`${notification.organization_name} - ${notification.body}`}
+                  value={human(notification.status)}
                 />
               ))}
             </Panel>

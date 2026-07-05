@@ -27,6 +27,8 @@ const requiredSnippets = [
   "Vendor Trust Profiles",
   "Request Logs",
   "Audit Events",
+  "Trust Score History",
+  "Notifications",
   "addEventListener(\"hashchange\", render)",
 ];
 

@@ -16,6 +16,8 @@ const requiredTables = [
   "documents",
   "buyer_requests",
   "verification_decisions",
+  "trust_score_snapshots",
+  "notifications",
   "audit_events",
   "request_logs",
 ];

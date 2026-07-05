@@ -26,6 +26,8 @@ const requiredSnippets = [
   "/api/trustpass",
   "Request Logs",
   "Audit Events",
+  "Trust Score History",
+  "Notifications",
 ];
 
 const publicGatewayUrl = normalizeUrl(

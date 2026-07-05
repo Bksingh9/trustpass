@@ -63,6 +63,30 @@ type DecisionRow = {
   created_at: string;
 };
 
+type ScoreSnapshotRow = {
+  id: string;
+  vendor_id: string;
+  vendor_name: string;
+  score: number;
+  status: string;
+  reason: string;
+  buyer_safe_summary: string;
+  evidence_request_id: string;
+  created_at: string;
+};
+
+type NotificationRow = {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  type: string;
+  title: string;
+  body: string;
+  status: string;
+  request_id: string;
+  created_at: string;
+};
+
 type AuditRow = {
   id: string;
   request_id: string;
@@ -105,6 +129,12 @@ async function ensureSchema(db: TrustpassD1Database) {
       "CREATE TABLE IF NOT EXISTS verification_decisions (id TEXT PRIMARY KEY, vendor_id TEXT NOT NULL, status TEXT NOT NULL, trust_score INTEGER NOT NULL DEFAULT 0, notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
     ),
     db.prepare(
+      "CREATE TABLE IF NOT EXISTS trust_score_snapshots (id TEXT PRIMARY KEY, vendor_id TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', buyer_safe_summary TEXT NOT NULL DEFAULT '', evidence_request_id TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+    ),
+    db.prepare(
+      "CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, type TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'unread', request_id TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+    ),
+    db.prepare(
       "CREATE TABLE IF NOT EXISTS audit_events (id TEXT PRIMARY KEY, request_id TEXT NOT NULL DEFAULT '', action TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, summary TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
     ),
     db.prepare(
@@ -113,6 +143,9 @@ async function ensureSchema(db: TrustpassD1Database) {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_org_type_created ON organizations (type, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_documents_org_created ON documents (organization_id, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_requests_vendor_created ON buyer_requests (vendor_id, created_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_score_snapshots_vendor_created ON trust_score_snapshots (vendor_id, created_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_notifications_org_created ON notifications (organization_id, created_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_notifications_status_created ON notifications (status, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_events (created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_request_logs_created ON request_logs (created_at)"),
   ]);
@@ -158,6 +191,24 @@ async function recordRequestLog(
     .run();
 }
 
+async function recordNotification(
+  db: TrustpassD1Database,
+  organizationId: string,
+  type: string,
+  title: string,
+  body: string,
+  requestId: string,
+) {
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      "INSERT INTO notifications (id, organization_id, type, title, body, request_id) VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(id, organizationId, type, title, body, requestId)
+    .run();
+  return id;
+}
+
 function responseInit(requestId: string, status = 200): ResponseInit {
   return {
     status,
@@ -198,6 +249,16 @@ async function readState(db: TrustpassD1Database) {
       "SELECT verification_decisions.*, organizations.name AS vendor_name FROM verification_decisions JOIN organizations ON organizations.id = verification_decisions.vendor_id ORDER BY verification_decisions.created_at DESC LIMIT 50",
     )
     .all<DecisionRow>();
+  const scoreSnapshots = await db
+    .prepare(
+      "SELECT trust_score_snapshots.*, organizations.name AS vendor_name FROM trust_score_snapshots JOIN organizations ON organizations.id = trust_score_snapshots.vendor_id ORDER BY trust_score_snapshots.created_at DESC LIMIT 50",
+    )
+    .all<ScoreSnapshotRow>();
+  const notifications = await db
+    .prepare(
+      "SELECT notifications.*, organizations.name AS organization_name FROM notifications LEFT JOIN organizations ON organizations.id = notifications.organization_id ORDER BY notifications.created_at DESC LIMIT 80",
+    )
+    .all<NotificationRow>();
   const audits = await db
     .prepare("SELECT * FROM audit_events ORDER BY created_at DESC LIMIT 80")
     .all<AuditRow>();
@@ -211,6 +272,8 @@ async function readState(db: TrustpassD1Database) {
     documents: documents.results ?? [],
     buyer_requests: buyerRequests.results ?? [],
     verification_decisions: decisions.results ?? [],
+    trust_score_snapshots: scoreSnapshots.results ?? [],
+    notifications: notifications.results ?? [],
     audit_events: audits.results ?? [],
     request_logs: requestLogs.results ?? [],
   };
@@ -321,19 +384,33 @@ export async function POST(request: Request) {
         id,
         `${buyer?.name ?? fallbackBuyerName} requested info from ${vendor.name}`,
       );
+      await recordNotification(
+        db,
+        vendor.id,
+        "buyer_request",
+        "New buyer request",
+        `${buyer?.name ?? fallbackBuyerName} requested ${subject}`,
+        requestId,
+      );
     } else if (action === "decide_verification") {
       const vendorId = String(payload.vendor_id ?? "");
       const decision = String(payload.status ?? "").trim();
       if (!vendorId || !["approved", "rejected", "changes_requested"].includes(decision)) {
         return fail("Vendor and valid decision are required");
       }
+      const vendor = await db
+        .prepare("SELECT id, name FROM organizations WHERE id = ? AND type = 'vendor'")
+        .bind(vendorId)
+        .first<{ id: string; name: string }>();
+      if (!vendor) return fail("Vendor not found");
       const score = Math.max(0, Math.min(100, Number(payload.trust_score ?? 0)));
       const id = crypto.randomUUID();
+      const notes = String(payload.notes ?? "").trim();
       await db
         .prepare(
           "INSERT INTO verification_decisions (id, vendor_id, status, trust_score, notes) VALUES (?, ?, ?, ?, ?)",
         )
-        .bind(id, vendorId, decision, score, String(payload.notes ?? "").trim())
+        .bind(id, vendorId, decision, score, notes)
         .run();
       await db
         .prepare(
@@ -341,6 +418,22 @@ export async function POST(request: Request) {
         )
         .bind(decision, score, vendorId)
         .run();
+      const snapshotId = crypto.randomUUID();
+      const buyerSafeSummary = `Trust score ${score} after ${decision.replace(/_/g, " ")} review.`;
+      await db
+        .prepare(
+          "INSERT INTO trust_score_snapshots (id, vendor_id, score, status, reason, buyer_safe_summary, evidence_request_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(snapshotId, vendorId, score, decision, notes || `Verification marked ${decision}`, buyerSafeSummary, requestId)
+        .run();
+      await recordNotification(
+        db,
+        vendorId,
+        "verification_decision",
+        "Verification decision recorded",
+        `${vendor.name} was marked ${decision} with trust score ${score}.`,
+        requestId,
+      );
       const auditAction = decision === "approved" ? "approve" : decision === "rejected" ? "reject" : "request_changes";
       await recordAudit(db, requestId, auditAction, "verification_decision", id, `Verification marked ${decision}`);
     } else {

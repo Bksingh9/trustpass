@@ -59,6 +59,39 @@ export const verificationDecisions = sqliteTable("verification_decisions", {
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const trustScoreSnapshots = sqliteTable(
+  "trust_score_snapshots",
+  {
+    id: text("id").primaryKey(),
+    vendorId: text("vendor_id").notNull(),
+    score: integer("score").notNull().default(0),
+    status: text("status").notNull(),
+    reason: text("reason").notNull().default(""),
+    buyerSafeSummary: text("buyer_safe_summary").notNull().default(""),
+    evidenceRequestId: text("evidence_request_id").notNull().default(""),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("idx_score_snapshots_vendor_created").on(table.vendorId, table.createdAt)],
+);
+
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    status: text("status").notNull().default("unread"),
+    requestId: text("request_id").notNull().default(""),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_notifications_org_created").on(table.organizationId, table.createdAt),
+    index("idx_notifications_status_created").on(table.status, table.createdAt),
+  ],
+);
+
 export const auditEvents = sqliteTable(
   "audit_events",
   {

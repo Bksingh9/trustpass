@@ -67,6 +67,8 @@ The deployed proof checks:
 - root app renders the live operations UI
 - no seeded demo/vendor strings are present
 - live vendor, buyer, document, buyer request, and verification decision writes
+- trust score snapshot persistence from verification decisions
+- notification persistence for buyer requests and verification decisions
 - final persistence read
 - matching `x-request-id`, `request_logs`, and `audit_events`
 
