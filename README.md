@@ -45,6 +45,9 @@ TRUSTPASS now has two supported operating modes:
 
 - Public demo: GitHub Pages serves the static TRUSTPASS workflow at `https://bksingh9.github.io/trustpass/`.
 - Full-stack proof: the FastAPI app exposes `/api/v1/demo/*` workflow endpoints that cover vendor renewal, buyer search, shortlisting, buyer requests, admin approval, contact/demo requests, audit-style events, and buyer-safe trust-profile exposure.
+- Real-data API proof: GitHub Actions runs a PostgreSQL-backed E2E check against production API routes, database persistence, request IDs, audit events, and activity logs. This path intentionally avoids `/api/v1/demo/*`.
+
+Production API deployments should set `ENABLE_DEMO_ROUTES=false` and point the web app at the deployed API host.
 
 Run the backend E2E proof after installing API dependencies:
 
@@ -87,3 +90,13 @@ http://127.0.0.1:4174/?api=http%3A%2F%2F127.0.0.1%3A8000%2Fapi%2Fv1#/
 ```
 
 GitHub Actions runs API, static Pages, and API-backed web checks on pushes and pull requests.
+
+Run the PostgreSQL-backed real-data check when a database is available:
+
+```bash
+cd apps/api
+set TRUSTPASS_REAL_DB_TESTS=1
+pytest tests/test_real_data_e2e.py
+```
+
+The real-data check requires migrated PostgreSQL tables and seed records from `python -m app.db.seed`.

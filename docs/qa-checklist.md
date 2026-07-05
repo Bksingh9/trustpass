@@ -64,6 +64,17 @@
 7. Submit a contact request through `/api/v1/demo/contact/demo-requests`.
 8. Confirm audit-style events are present in `/api/v1/demo/state`.
 
+## Real-Data API Contract
+
+1. Run PostgreSQL migrations and `python -m app.db.seed`.
+2. Set `TRUSTPASS_REAL_DB_TESTS=1`.
+3. Run `pytest tests/test_real_data_e2e.py`.
+4. Confirm the test uses `/api/v1/buyers`, `/api/v1/documents`, `/api/v1/vendors`, `/api/v1/verification`, and `/api/v1/audit`.
+5. Confirm no `/api/v1/demo/*` route is used by the real-data E2E.
+6. Confirm responses include `x-request-id`.
+7. Confirm audit events include `upload`, `review`, `submit`, and `approve`.
+8. Confirm activity logs include `upload_document`, `submit_verification`, and `decide_verification`.
+
 ## API-Backed Browser Demo
 
 1. Start FastAPI on `http://127.0.0.1:8000`.

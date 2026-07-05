@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     email_provider: str = "mock"
     sentry_dsn: str | None = None
     log_level: str = "INFO"
+    enable_demo_routes: bool = True
 
 
 @lru_cache

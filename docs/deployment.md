@@ -24,6 +24,15 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
+For production API deployments, set:
+
+```bash
+ENVIRONMENT=production
+ENABLE_DEMO_ROUTES=false
+```
+
+That keeps `/api/v1/demo/*` out of the public API while preserving the local and CI demo contract when explicitly enabled.
+
 ## Database
 
 Run migrations:
@@ -33,7 +42,7 @@ cd apps/api
 alembic upgrade head
 ```
 
-Seed demo data:
+Seed local development records:
 
 ```bash
 python -m app.db.seed
@@ -68,6 +77,31 @@ The public demo is served by GitHub Pages from the `gh-pages` branch:
 - Browser behavior: single-page app fallback via matching `index.html` and `404.html`
 
 GitHub Pages is static hosting, so it does not run the FastAPI backend. The repository keeps the backend end-to-end proof under `/api/v1/demo/*` for local, container, and CI verification until a real API host is attached.
+
+## Real-Data API Verification
+
+The API has a PostgreSQL-backed E2E path that uses production routes instead of demo routes. It verifies:
+
+- request-level JSON logs with `x-request-id`
+- buyer-safe vendor search through `/api/v1/buyers/search`
+- shortlist and buyer request persistence
+- document metadata persistence and admin review
+- vendor verification submission and admin decision
+- audit event and activity log retrieval through `/api/v1/audit/events` and `/api/v1/audit/activity`
+
+GitHub Actions runs this in the `Real-data API E2E` job with a PostgreSQL service, migrations, seed records, and `TRUSTPASS_REAL_DB_TESTS=1`.
+
+Local command when PostgreSQL is running:
+
+```bash
+cd apps/api
+alembic upgrade head
+python -m app.db.seed
+set TRUSTPASS_REAL_DB_TESTS=1
+pytest tests/test_real_data_e2e.py
+```
+
+This is the current no-demo API proof. The public GitHub Pages site can only use it end-to-end after FastAPI is deployed to a public HTTPS API host and the web app is configured with that API base URL.
 
 ## Local API-Backed Web Demo
 
@@ -108,6 +142,7 @@ The API default CORS allowlist includes:
 GitHub Actions runs `.github/workflows/ci.yml` on pushes and pull requests:
 
 - API tests install `apps/api` and run `pytest`, including `tests/test_demo_e2e.py`.
+- Real-data API E2E starts PostgreSQL, runs migrations and seed records, then verifies production API routes and audit/activity logs.
 - Static Pages smoke runs `node apps/web/scripts/e2e-static.mjs`.
 - API-backed web smoke starts FastAPI, serves the generated Pages app locally, and runs `node apps/web/scripts/e2e-api-backed.mjs`.
 

@@ -35,6 +35,50 @@ jobs:
       - name: Run API tests
         run: pytest
 
+  real-data-api:
+    name: Real-data API E2E
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: trustpass
+          POSTGRES_PASSWORD: trustpass
+          POSTGRES_DB: trustpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trustpass -d trustpass"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      DATABASE_URL: postgresql+psycopg://trustpass:trustpass@localhost:5432/trustpass
+      TRUSTPASS_REAL_DB_TESTS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install API dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run migrations
+        run: python -m alembic upgrade head
+
+      - name: Seed live-style records
+        run: python -m app.db.seed
+
+      - name: Run real-data E2E
+        run: pytest tests/test_real_data_e2e.py
+
   static-pages:
     name: Static Pages smoke
     runs-on: ubuntu-latest
