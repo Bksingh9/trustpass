@@ -26,6 +26,5 @@ async def readiness(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> HealthResponse:
-    db.execute(text("select 1"))
+    db.execute(text("select 1 from organizations limit 1"))
     return HealthResponse(status="ready", service=settings.app_name, environment=settings.environment)
-

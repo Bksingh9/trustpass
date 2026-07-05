@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: trustpass-api
+    env: docker
+    rootDir: apps/api
+    healthCheckPath: /api/v1/readiness
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: ENABLE_DEMO_ROUTES
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trustpass-postgres
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: '["https://bksingh9.github.io"]'
+
+databases:
+  - name: trustpass-postgres
+    databaseName: trustpass
+    user: trustpass

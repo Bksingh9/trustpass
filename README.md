@@ -46,6 +46,7 @@ TRUSTPASS now has two supported operating modes:
 - Public demo: GitHub Pages serves the static TRUSTPASS workflow at `https://bksingh9.github.io/trustpass/`.
 - Full-stack proof: the FastAPI app exposes `/api/v1/demo/*` workflow endpoints that cover vendor renewal, buyer search, shortlisting, buyer requests, admin approval, contact/demo requests, audit-style events, and buyer-safe trust-profile exposure.
 - Real-data API proof: GitHub Actions runs a PostgreSQL-backed E2E check against production API routes, database persistence, request IDs, audit events, and activity logs. This path intentionally avoids `/api/v1/demo/*`.
+- Worker/D1 live proof: `apps/live` contains a D1-backed Worker app with `/api/health`, `/api/readiness`, `/api/trustpass`, durable request logs, and audit correlation. The `TRUSTPASS Live App` GitHub Actions workflow runs the same write/read proof locally and can run it against a deployed URL via `TRUSTPASS_LIVE_BASE_URL`.
 
 Production API deployments should set `ENABLE_DEMO_ROUTES=false` and point the web app at the deployed API host.
 
@@ -100,3 +101,16 @@ pytest tests/test_real_data_e2e.py
 ```
 
 The real-data check requires migrated PostgreSQL tables and seed records from `python -m app.db.seed`.
+
+## Production Host Readiness
+
+`render.yaml` defines a managed-Postgres FastAPI deployment path. The API
+container runs Alembic migrations before serving, sets `ENABLE_DEMO_ROUTES=false`,
+and uses `/api/v1/readiness` as the health check. Hosted Postgres URLs such as
+`postgres://...` and `postgresql://...` are normalized to the installed
+`postgresql+psycopg://...` SQLAlchemy driver.
+
+The current GitHub Pages URL is still a static demo and is not the real live API:
+`https://bksingh9.github.io/trustpass/api/health` returns `404`. Treat the goal
+as complete only after a real Worker or FastAPI host returns health/readiness
+success and passes the live E2E proof.
