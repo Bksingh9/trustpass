@@ -1,0 +1,76 @@
+name: TRUSTPASS Live App
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-d1-live-e2e:
+    name: Worker D1 live E2E
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/live
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/live/package-lock.json
+
+      - name: Install live app dependencies
+        run: npm ci
+
+      - name: Build Worker app
+        run: npm run build
+
+      - name: Start local Worker app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run dev -- --host 127.0.0.1 --port 4180 > live-dev.log 2>&1 &
+          echo "$!" > live-dev.pid
+
+      - name: Run live D1 E2E proof
+        run: npm run e2e:live -- --base-url http://127.0.0.1:4180/
+
+      - name: Show local Worker logs
+        if: always()
+        shell: bash
+        run: cat live-dev.log || true
+
+      - name: Stop local Worker app
+        if: always()
+        shell: bash
+        run: kill "$(cat live-dev.pid)" || true
+
+  deployed-live-e2e:
+    name: Deployed live E2E
+    if: ${{ vars.TRUSTPASS_LIVE_BASE_URL != '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/live
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify deployed live API and data path
+        env:
+          TRUSTPASS_LIVE_BASE_URL: ${{ vars.TRUSTPASS_LIVE_BASE_URL }}
+        run: npm run e2e:live

@@ -114,18 +114,6 @@ export default function Home() {
   const [status, setStatus] = useState("Connecting to live D1 data");
   const [lastRequestId, setLastRequestId] = useState("");
 
-  async function refresh() {
-    const response = await fetch("/api/trustpass", { cache: "no-store" });
-    const payload = await response.json();
-    if (!response.ok) {
-      throw new Error(payload.error ?? "Unable to read TRUSTPASS data");
-    }
-    setState(payload.data);
-    setLastRequestId(response.headers.get("x-request-id") ?? payload.request_id ?? "");
-    setLoading(false);
-    setStatus("Live D1 data connected");
-  }
-
   async function submit(action: string, form: HTMLFormElement) {
     setStatus("Saving live record");
     const response = await fetch("/api/trustpass", {
@@ -155,10 +143,32 @@ export default function Home() {
   }
 
   useEffect(() => {
-    refresh().catch((error) => {
-      setLoading(false);
-      setStatus(error instanceof Error ? error.message : "Unable to connect");
-    });
+    let active = true;
+
+    async function load() {
+      try {
+        const response = await fetch("/api/trustpass", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to read TRUSTPASS data");
+        }
+        if (!active) return;
+        setState(payload.data);
+        setLastRequestId(response.headers.get("x-request-id") ?? payload.request_id ?? "");
+        setLoading(false);
+        setStatus("Live D1 data connected");
+      } catch (error) {
+        if (!active) return;
+        setLoading(false);
+        setStatus(error instanceof Error ? error.message : "Unable to connect");
+      }
+    }
+
+    void load();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const totals = useMemo(

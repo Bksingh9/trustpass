@@ -14,6 +14,7 @@ It intentionally starts empty, with no vendor or buyer records. Use the UI or
 pnpm install
 pnpm run build
 pnpm run dev
+pnpm run e2e:live -- --base-url http://localhost:4175/
 ```
 
 ## API Actions
@@ -33,3 +34,13 @@ pnpm run dev
 Every API response includes an `x-request-id`, every request is persisted to
 `request_logs`, and every write action creates an `audit_events` row carrying
 the same request ID for operational sanity checks.
+
+## Live Acceptance Gate
+
+Set the repository variable `TRUSTPASS_LIVE_BASE_URL` to the deployed Worker URL
+after a real host is available. The `TRUSTPASS Live App` workflow will run the
+same end-to-end proof against that deployed URL.
+
+The GitHub Pages URL is not a valid value for `TRUSTPASS_LIVE_BASE_URL`; it is a
+static demo and does not expose `/api/health`, `/api/readiness`, or D1-backed
+write APIs.
