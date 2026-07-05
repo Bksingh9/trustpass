@@ -14,8 +14,8 @@ Add these repository secrets:
 The token must be allowed to deploy Workers and apply D1 migrations for the
 target account.
 
-Create a Cloudflare D1 database before running the workflow. Keep its database
-name and database ID ready.
+The workflow can use an existing Cloudflare D1 database ID, or it can resolve an
+existing database by name and create it when it does not exist.
 
 Cloudflare's Worker CI/CD guide documents the same secret boundary for
 non-interactive Wrangler deploys. Cloudflare's D1 migration guide documents
@@ -30,14 +30,17 @@ Actions tab.
 Use these inputs:
 
 - `worker_name`: default `trustpass-live`
-- `d1_database_name`: the existing D1 database name
-- `d1_database_id`: the existing D1 database ID
+- `d1_database_name`: the D1 database name; default `trustpass-live`
+- `d1_database_id`: optional existing D1 database ID; leave blank to resolve or
+  create by name
+- `d1_primary_location_hint`: optional D1 location hint
 - `live_base_url`: the deployed Worker URL, for example
   `https://trustpass-live.<account>.workers.dev/`
 
-The workflow installs the live app, builds the Worker bundle, patches the
-generated `dist/server/wrangler.json` with the real Worker and D1 binding,
-applies the D1 migrations, deploys the Worker, and runs the deployed E2E proof.
+The workflow resolves or creates the D1 database, installs the live app, builds
+the Worker bundle, patches the generated `dist/server/wrangler.json` with the
+real Worker and D1 binding, applies the D1 migrations, deploys the Worker, and
+runs the deployed E2E proof.
 
 ## Acceptance Proof
 
@@ -71,5 +74,6 @@ host.
 ## References
 
 - [Cloudflare Workers GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)
+- [Cloudflare D1 database API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/list/)
 - [Cloudflare D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
 - [GitHub Pages documentation](https://docs.github.com/en/pages)

@@ -14,8 +14,14 @@ on:
         default: trustpass-live
         type: string
       d1_database_id:
-        description: Existing Cloudflare D1 database ID.
-        required: true
+        description: Existing Cloudflare D1 database ID. Leave blank to create or resolve by name.
+        required: false
+        default: ""
+        type: string
+      d1_primary_location_hint:
+        description: Optional D1 primary location hint such as wnam, enam, weur, eeur, apac, or oc.
+        required: false
+        default: ""
         type: string
       live_base_url:
         description: Public deployed Worker URL, ending at the app root.
@@ -42,6 +48,7 @@ jobs:
       TRUSTPASS_WORKER_NAME: ${{ inputs.worker_name }}
       TRUSTPASS_D1_DATABASE_NAME: ${{ inputs.d1_database_name }}
       TRUSTPASS_D1_DATABASE_ID: ${{ inputs.d1_database_id }}
+      TRUSTPASS_D1_PRIMARY_LOCATION_HINT: ${{ inputs.d1_primary_location_hint }}
       TRUSTPASS_LIVE_BASE_URL: ${{ inputs.live_base_url }}
       TRUSTPASS_REQUIRE_CORS_PREFLIGHT: "1"
     steps:
@@ -61,6 +68,9 @@ jobs:
           set -euo pipefail
           test -n "${CLOUDFLARE_ACCOUNT_ID}"
           test -n "${CLOUDFLARE_API_TOKEN}"
+
+      - name: Ensure D1 database
+        run: node scripts/ensure-cloudflare-d1.mjs
 
       - name: Install live app dependencies
         run: npm ci
