@@ -49,6 +49,7 @@ TRUSTPASS now has two supported operating modes:
 - Worker/D1 live proof: `apps/live` contains a D1-backed Worker app with `/api/health`, `/api/readiness`, `/api/trustpass`, durable request logs, and audit correlation. The `TRUSTPASS Live App` GitHub Actions workflow runs the same write/read proof locally and can run it against a deployed URL via `TRUSTPASS_LIVE_BASE_URL`.
 - Public live gateway: the GitHub Pages build reads repository variable `TRUSTPASS_LIVE_BASE_URL` and preconnects the public gateway to that Worker URL when it is set.
 - Worker deployment: the `Deploy TRUSTPASS Live Worker` workflow can resolve an existing D1 database by name or create it before applying migrations, resolving the deployed Worker URL, running the deployed E2E proof, saving the live URL as a repo variable when permitted, and publishing the public gateway preconnected to that URL.
+- Manual live verification: the `Verify TRUSTPASS Live URL` workflow reruns the live API and public gateway proofs against a supplied Worker URL without redeploying.
 
 Production API deployments should set `ENABLE_DEMO_ROUTES=false` and point the web app at the deployed API host.
 

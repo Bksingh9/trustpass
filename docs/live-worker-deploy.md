@@ -91,6 +91,11 @@ uploads `trustpass-public-gateway-proof`, which confirms the gateway is live,
 preconnected to the Worker URL, free of seeded demo strings, and still serving
 `/api/health` as a static 404 rather than a fake API.
 
+Use the manual `Verify TRUSTPASS Live URL` workflow to re-run the deployed API
+and public gateway proofs against any Worker URL without redeploying. It uploads
+separate `trustpass-live-url-api-proof` and
+`trustpass-live-url-public-gateway-proof` artifacts.
+
 ## References
 
 - [Cloudflare Workers GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)

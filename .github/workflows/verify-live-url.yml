@@ -1,0 +1,80 @@
+name: Verify TRUSTPASS Live URL
+
+on:
+  workflow_dispatch:
+    inputs:
+      live_base_url:
+        description: Public TRUSTPASS Worker URL to verify.
+        required: true
+        type: string
+      public_gateway_url:
+        description: Public GitHub Pages gateway URL.
+        required: true
+        default: https://bksingh9.github.io/trustpass/
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live-api:
+    name: Live API E2E proof
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/live
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/live/package-lock.json
+
+      - name: Install live app dependencies
+        run: npm ci
+
+      - name: Verify live API data path
+        env:
+          TRUSTPASS_LIVE_BASE_URL: ${{ inputs.live_base_url }}
+          TRUSTPASS_REQUIRE_CORS_PREFLIGHT: "1"
+          TRUSTPASS_LIVE_PROOF_PATH: live-url-e2e-proof.json
+        run: npm run e2e:live
+
+      - name: Upload live API proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustpass-live-url-api-proof
+          path: apps/live/live-url-e2e-proof.json
+          if-no-files-found: warn
+
+  verify-public-gateway:
+    name: Public gateway proof
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify public gateway and live API connection
+        env:
+          TRUSTPASS_PUBLIC_GATEWAY_URL: ${{ inputs.public_gateway_url }}
+          TRUSTPASS_LIVE_BASE_URL: ${{ inputs.live_base_url }}
+          TRUSTPASS_PUBLIC_GATEWAY_PROOF_PATH: apps/web/public-gateway-live-url-proof.json
+        run: node apps/web/scripts/e2e-public-gateway.mjs
+
+      - name: Upload public gateway proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustpass-live-url-public-gateway-proof
+          path: apps/web/public-gateway-live-url-proof.json
+          if-no-files-found: warn
