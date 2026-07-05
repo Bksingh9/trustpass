@@ -57,15 +57,34 @@ make api-seed
 
 ## Production Shape
 
-- Web: Vercel or containerized Next.js.
-- API: container service.
-- Worker: separate Celery worker container.
+- Web: Vercel, Render, or containerized Next.js.
+- API: Render/container service.
+- Worker: separate Celery worker container when async jobs are needed.
 - Database: managed PostgreSQL.
 - Queue: managed Redis.
 - Storage: S3-compatible object storage.
 - Auth: Supabase project.
 - Email: Resend or Postmark.
 - Billing: Stripe and/or Razorpay.
+
+## No-Cloudflare Live Plan
+
+Cloudflare is not required for TRUSTPASS. The required live components are a
+public HTTPS API and a durable database. The preferred no-Cloudflare path is:
+
+- API host: Render web service from `apps/api/Dockerfile`.
+- Database: Render managed PostgreSQL from `render.yaml`.
+- Demo routes: disabled with `ENABLE_DEMO_ROUTES=false`.
+- Bootstrap: `TRUSTPASS_SEED_ON_START=true` runs migrations plus realistic
+  verification seed records so the deployed E2E can authenticate deterministic
+  buyer, vendor, and admin contexts, then create fresh live records.
+- Verification: set repository variable `TRUSTPASS_API_BASE_URL` to the deployed
+  API URL and run `.github/workflows/verify-deployed-api.yml`.
+
+This proof uses production routes, not `/api/v1/demo/*`, and verifies
+health/readiness, buyer-safe search, shortlist persistence, buyer request
+persistence, document upload/review, verification decision, audit events,
+activity logs, and request IDs.
 
 ## Current Public Gateway
 
@@ -77,12 +96,15 @@ The public gateway is served by GitHub Pages from the `gh-pages` branch:
 - Browser behavior: single-page app fallback via matching `index.html` and `404.html`
 
 GitHub Pages is static hosting, so it does not run the API or write to a
-database. It must point at the deployed Worker/D1 API through
-`TRUSTPASS_LIVE_BASE_URL` before it counts as a live real-data surface.
-After that connection exists, the public gateway writes through the Worker API;
-the public gateway proof creates and re-reads live vendor, buyer, document,
-buyer request, verification decision, log, audit, score snapshot, and
-notification records.
+database. It is not the primary no-Cloudflare live app. The no-Cloudflare live
+proof is the Render/FastAPI/PostgreSQL API verified through
+`TRUSTPASS_API_BASE_URL`.
+
+If the optional Cloudflare Worker path is used, Pages can point at the deployed
+Worker/D1 API through `TRUSTPASS_LIVE_BASE_URL`. After that connection exists,
+the public gateway writes through the Worker API; the public gateway proof
+creates and re-reads live vendor, buyer, document, buyer request, verification
+decision, log, audit, score snapshot, and notification records.
 The same-origin Pages path `https://bksingh9.github.io/trustpass/api/health`
 must remain a static `404`; the real live API is the separate Cloudflare Worker
 URL verified by `.github/workflows/live-app.yml` and
@@ -102,6 +124,9 @@ The API has a PostgreSQL-backed E2E path that uses production routes instead of 
 - audit event and activity log retrieval through `/api/v1/audit/events` and `/api/v1/audit/activity`
 
 GitHub Actions runs this in the `Real-data API E2E` job with a PostgreSQL service, migrations, seed records, and `TRUSTPASS_REAL_DB_TESTS=1`.
+For a deployed API host, `.github/workflows/verify-deployed-api.yml` runs
+`apps/api/scripts/e2e_deployed_real_api.py` against `TRUSTPASS_API_BASE_URL` and
+uploads `trustpass-deployed-api-proof`.
 
 Local command when PostgreSQL is running:
 

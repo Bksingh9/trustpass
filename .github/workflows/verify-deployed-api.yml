@@ -1,0 +1,77 @@
+name: Verify TRUSTPASS Deployed API
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: Public TRUSTPASS FastAPI base URL. May include or omit /api/v1.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-gate:
+    name: Check deployed API URL
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+      api_base_url: ${{ steps.check.outputs.api_base_url }}
+    env:
+      INPUT_API_BASE_URL: ${{ github.event.inputs.api_base_url || '' }}
+      TRUSTPASS_API_BASE_URL: ${{ vars.TRUSTPASS_API_BASE_URL || '' }}
+    steps:
+      - name: Check API URL
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_base_url="${INPUT_API_BASE_URL:-$TRUSTPASS_API_BASE_URL}"
+          if [[ -n "$api_base_url" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "api_base_url=$api_base_url" >> "$GITHUB_OUTPUT"
+            echo "Deployed API URL is configured." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "api_base_url=" >> "$GITHUB_OUTPUT"
+            echo "Set repository variable TRUSTPASS_API_BASE_URL to the deployed Render/FastAPI URL to run deployed real-data E2E." >> "$GITHUB_STEP_SUMMARY"
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              exit 1
+            fi
+          fi
+
+  verify:
+    name: Deployed FastAPI/Postgres E2E
+    needs: verify-gate
+    if: needs.verify-gate.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      TRUSTPASS_API_BASE_URL: ${{ needs.verify-gate.outputs.api_base_url }}
+      TRUSTPASS_API_PROOF_PATH: deployed-api-proof.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run deployed real-data API proof
+        run: python scripts/e2e_deployed_real_api.py
+
+      - name: Upload deployed API proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustpass-deployed-api-proof
+          path: apps/api/deployed-api-proof.json
+          if-no-files-found: warn

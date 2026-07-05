@@ -66,6 +66,7 @@ jobs:
 
   deployed-live-e2e:
     name: Deployed live E2E
+    if: vars.TRUSTPASS_LIVE_BASE_URL != ''
     runs-on: ubuntu-latest
     defaults:
       run:

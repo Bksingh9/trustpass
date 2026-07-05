@@ -75,6 +75,17 @@
 7. Confirm audit events include `upload`, `review`, `submit`, and `approve`.
 8. Confirm activity logs include `upload_document`, `submit_verification`, and `decide_verification`.
 
+## No-Cloudflare Render Live Contract
+
+1. Deploy `render.yaml` with the `trustpass-api` service and `trustpass-postgres` database.
+2. Confirm production env has `ENABLE_DEMO_ROUTES=false` and `TRUSTPASS_SEED_ON_START=true` for bootstrap verification.
+3. Set repository variable `TRUSTPASS_API_BASE_URL` to the deployed API URL.
+4. Run `.github/workflows/verify-deployed-api.yml` or `python apps/api/scripts/e2e_deployed_real_api.py --base-url <api-url>`.
+5. Confirm `/api/v1/health` and `/api/v1/readiness` pass on the public HTTPS API.
+6. Confirm `/api/v1/demo/health` returns `404`.
+7. Confirm the deployed proof creates live shortlist, buyer request, document, review, verification decision, audit events, and activity logs through production routes.
+8. Confirm every proof response has an `x-request-id`.
+
 ## API-Backed Browser Demo
 
 1. Start FastAPI on `http://127.0.0.1:8000`.
@@ -84,7 +95,7 @@
 5. Use the UI to submit renewal, shortlist, request, approve, and submit a demo request.
 6. Confirm `/api/v1/demo/state` reflects `submitted`, one shortlist, one buyer request, one demo request, approved review, and audit events.
 
-## Worker/D1 Live Contract
+## Optional Worker/D1 Live Contract
 
 1. Run `npm run e2e:live` from `apps/live` against the deployed Worker URL.
 2. Confirm `/api/health` returns `service: trustpass-live`, `runtime: sites-worker-d1`, and `demo_data_enabled: false`.

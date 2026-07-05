@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -55,6 +56,10 @@ def _exists(db: Session, model: type, **filters: object) -> bool:
     return db.execute(statement).scalar_one_or_none() is not None
 
 
+def stable_seed_id(kind: str, key: str):
+    return uuid5(NAMESPACE_URL, f"trustpass:seed:{kind}:{key}")
+
+
 def seed(db: Session) -> None:
     if _exists(db, Organization, slug="atlas-freight-partners"):
         return
@@ -69,8 +74,9 @@ def seed(db: Session) -> None:
     ]
     db.add_all(roles)
 
-    internal = Organization(name="TRUSTPASS Operations", slug="trustpass-ops", type=OrganizationType.internal)
+    internal = Organization(id=stable_seed_id("organization", "trustpass-ops"), name="TRUSTPASS Operations", slug="trustpass-ops", type=OrganizationType.internal)
     buyer = Organization(
+        id=stable_seed_id("organization", "brightline-procurement"),
         name="Brightline Procurement",
         slug="brightline-procurement",
         type=OrganizationType.buyer,
@@ -81,6 +87,7 @@ def seed(db: Session) -> None:
     )
     vendors = [
         Organization(
+            id=stable_seed_id("organization", "atlas-freight-partners"),
             name="Atlas Freight Partners",
             slug="atlas-freight-partners",
             type=OrganizationType.vendor,
@@ -90,6 +97,7 @@ def seed(db: Session) -> None:
             industry="Logistics",
         ),
         Organization(
+            id=stable_seed_id("organization", "northstar-digital-studio"),
             name="Northstar Digital Studio",
             slug="northstar-digital-studio",
             type=OrganizationType.vendor,
@@ -99,6 +107,7 @@ def seed(db: Session) -> None:
             industry="Digital services",
         ),
         Organization(
+            id=stable_seed_id("organization", "clearpath-advisory"),
             name="Clearpath Advisory",
             slug="clearpath-advisory",
             type=OrganizationType.vendor,
@@ -111,13 +120,13 @@ def seed(db: Session) -> None:
     db.add_all([internal, buyer, *vendors])
     db.flush()
 
-    admin_1 = User(auth_subject_id="seed-admin-1", email="admin1@trustpass.local", full_name="Asha Reviewer")
-    admin_2 = User(auth_subject_id="seed-admin-2", email="admin2@trustpass.local", full_name="Rohan Admin")
-    buyer_user = User(auth_subject_id="seed-buyer-1", email="buyer@brightline.local", full_name="Maya Procurement")
+    admin_1 = User(id=stable_seed_id("user", "seed-admin-1"), auth_subject_id="seed-admin-1", email="admin1@trustpass.local", full_name="Asha Reviewer")
+    admin_2 = User(id=stable_seed_id("user", "seed-admin-2"), auth_subject_id="seed-admin-2", email="admin2@trustpass.local", full_name="Rohan Admin")
+    buyer_user = User(id=stable_seed_id("user", "seed-buyer-1"), auth_subject_id="seed-buyer-1", email="buyer@brightline.local", full_name="Maya Procurement")
     vendor_users = [
-        User(auth_subject_id="seed-vendor-1", email="ops@atlas.local", full_name="Kabir Atlas"),
-        User(auth_subject_id="seed-vendor-2", email="hello@northstar.local", full_name="Isha Northstar"),
-        User(auth_subject_id="seed-vendor-3", email="partners@clearpath.local", full_name="Dev Clearpath"),
+        User(id=stable_seed_id("user", "seed-vendor-1"), auth_subject_id="seed-vendor-1", email="ops@atlas.local", full_name="Kabir Atlas"),
+        User(id=stable_seed_id("user", "seed-vendor-2"), auth_subject_id="seed-vendor-2", email="hello@northstar.local", full_name="Isha Northstar"),
+        User(id=stable_seed_id("user", "seed-vendor-3"), auth_subject_id="seed-vendor-3", email="partners@clearpath.local", full_name="Dev Clearpath"),
     ]
     db.add_all([admin_1, admin_2, buyer_user, *vendor_users])
     db.flush()
@@ -149,12 +158,12 @@ def seed(db: Session) -> None:
     db.flush()
 
     doc_types = [
-        DocumentType(code="business_registration", name="Business registration", category="identity", is_required=True),
-        DocumentType(code="tax_registration", name="Tax registration", category="tax", is_required=True),
-        DocumentType(code="bank_proof", name="Bank proof", category="finance", is_required=True),
-        DocumentType(code="address_proof", name="Address proof", category="identity", is_required=True),
-        DocumentType(code="insurance", name="Insurance certificate", category="compliance", requires_expiry_date=True),
-        DocumentType(code="category_compliance", name="Category compliance", category="compliance"),
+        DocumentType(id=stable_seed_id("document_type", "business_registration"), code="business_registration", name="Business registration", category="identity", is_required=True),
+        DocumentType(id=stable_seed_id("document_type", "tax_registration"), code="tax_registration", name="Tax registration", category="tax", is_required=True),
+        DocumentType(id=stable_seed_id("document_type", "bank_proof"), code="bank_proof", name="Bank proof", category="finance", is_required=True),
+        DocumentType(id=stable_seed_id("document_type", "address_proof"), code="address_proof", name="Address proof", category="identity", is_required=True),
+        DocumentType(id=stable_seed_id("document_type", "insurance"), code="insurance", name="Insurance certificate", category="compliance", requires_expiry_date=True),
+        DocumentType(id=stable_seed_id("document_type", "category_compliance"), code="category_compliance", name="Category compliance", category="compliance"),
     ]
     db.add_all(doc_types)
     db.flush()
@@ -369,4 +378,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
