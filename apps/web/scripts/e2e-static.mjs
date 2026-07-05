@@ -19,6 +19,7 @@ const requiredSnippets = [
   "TRUSTPASS Live Gateway",
   "Connect Live API",
   "trustpass-live-api-base-url",
+  "buildConfiguredApiBaseUrl",
   "/api/health",
   "/api/readiness",
   "/api/trustpass",
@@ -54,6 +55,11 @@ for (const snippet of requiredSnippets) {
 
 for (const snippet of forbiddenSnippets) {
   assert(!indexHtml.includes(snippet), "Static artifact still contains forbidden content: " + snippet);
+}
+
+if (process.env.TRUSTPASS_LIVE_BASE_URL) {
+  const expectedLiveUrl = process.env.TRUSTPASS_LIVE_BASE_URL.replace(/\/$/, "");
+  assert(indexHtml.includes(JSON.stringify(expectedLiveUrl)), "Static artifact is missing configured live API URL");
 }
 
 assert(notFoundHtml === indexHtml, "404.html must match index.html for SPA fallback");

@@ -47,6 +47,7 @@ TRUSTPASS now has two supported operating modes:
 - Full-stack proof: the FastAPI app exposes `/api/v1/demo/*` workflow endpoints that cover vendor renewal, buyer search, shortlisting, buyer requests, admin approval, contact/demo requests, audit-style events, and buyer-safe trust-profile exposure.
 - Real-data API proof: GitHub Actions runs a PostgreSQL-backed E2E check against production API routes, database persistence, request IDs, audit events, and activity logs. This path intentionally avoids `/api/v1/demo/*`.
 - Worker/D1 live proof: `apps/live` contains a D1-backed Worker app with `/api/health`, `/api/readiness`, `/api/trustpass`, durable request logs, and audit correlation. The `TRUSTPASS Live App` GitHub Actions workflow runs the same write/read proof locally and can run it against a deployed URL via `TRUSTPASS_LIVE_BASE_URL`.
+- Public live gateway: the GitHub Pages build reads repository variable `TRUSTPASS_LIVE_BASE_URL` and preconnects the public gateway to that Worker URL when it is set.
 
 Production API deployments should set `ENABLE_DEMO_ROUTES=false` and point the web app at the deployed API host.
 

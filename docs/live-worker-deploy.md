@@ -54,13 +54,19 @@ The deployed proof checks:
 
 After the Worker is live, set repository variable `TRUSTPASS_LIVE_BASE_URL` to
 the same Worker URL. The existing `TRUSTPASS Live App` workflow will then run
-the deployed-live acceptance check on future pushes.
+the deployed-live acceptance check on future pushes, and the Pages build will
+embed that URL as the default public gateway connection.
 
 ## Public Site Wiring
 
 Open `https://bksingh9.github.io/trustpass/`, enter the Worker URL in the live
 API connection field, and save it. The gateway will then call the Worker API
 instead of serving any local seeded state.
+
+When repository variable `TRUSTPASS_LIVE_BASE_URL` is set before the Pages
+workflow runs, the public gateway is preconnected to that Worker URL. The manual
+connection form remains available as an override for testing a different live
+host.
 
 ## References
 

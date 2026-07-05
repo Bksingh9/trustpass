@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, "..");
 const pagesRoot = path.join(webRoot, "pages");
+const liveApiBaseUrl = (process.env.TRUSTPASS_LIVE_BASE_URL || "").trim().replace(/\/$/, "");
 
 rmSync(pagesRoot, { recursive: true, force: true });
 mkdirSync(pagesRoot, { recursive: true });
@@ -194,7 +195,8 @@ const html = `<!doctype html>
   <script>
     const runtimeParams = new URLSearchParams(location.search);
     const storageKey = "trustpass-live-api-base-url";
-    const configuredApiBaseUrl = (runtimeParams.get("api") || localStorage.getItem(storageKey) || "").replace(/\\/$/, "");
+    const buildConfiguredApiBaseUrl = ${JSON.stringify(liveApiBaseUrl)};
+    const configuredApiBaseUrl = (runtimeParams.get("api") || localStorage.getItem(storageKey) || buildConfiguredApiBaseUrl || "").replace(/\\/$/, "");
     if (runtimeParams.get("api")) {
       localStorage.setItem(storageKey, configuredApiBaseUrl);
     }
