@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,7 @@ def request_json(
     payload: dict[str, Any] | None = None,
     query: dict[str, str] | None = None,
     expected_statuses: set[int] | None = None,
+    attempts: int = 5,
 ) -> tuple[int, dict[str, Any], dict[str, str]]:
     expected = expected_statuses or {200}
     url = f"{base_url}{path}"
@@ -60,15 +62,23 @@ def request_json(
         request_headers["content-type"] = "application/json"
     request = Request(url, data=body, headers=request_headers, method=method)
 
-    try:
-        with urlopen(request, timeout=30) as response:
-            response_body = response.read().decode("utf-8")
-            status = response.status
-            response_headers = {key.lower(): value for key, value in response.headers.items()}
-    except HTTPError as error:
-        response_body = error.read().decode("utf-8")
-        status = error.code
-        response_headers = {key.lower(): value for key, value in error.headers.items()}
+    response_body = ""
+    status = 0
+    response_headers: dict[str, str] = {}
+    for attempt in range(1, attempts + 1):
+        try:
+            with urlopen(request, timeout=30) as response:
+                response_body = response.read().decode("utf-8")
+                status = response.status
+                response_headers = {key.lower(): value for key, value in response.headers.items()}
+        except HTTPError as error:
+            response_body = error.read().decode("utf-8")
+            status = error.code
+            response_headers = {key.lower(): value for key, value in error.headers.items()}
+
+        if status in expected or attempt == attempts:
+            break
+        time.sleep(2)
 
     assert_condition(
         status in expected,
