@@ -203,15 +203,27 @@ const html = `<!doctype html>
   <script>
     const runtimeParams = new URLSearchParams(location.search);
     const storageKey = "trustpass-live-api-base-url";
+    const adminStorageKey = "trustpass-live-admin-context";
     const buildConfiguredApiBaseUrl = ${JSON.stringify(liveApiBaseUrl)};
     const configuredApiBaseUrl = (runtimeParams.get("api") || localStorage.getItem(storageKey) || buildConfiguredApiBaseUrl || "").replace(/\\/$/, "");
     if (runtimeParams.get("api")) {
       localStorage.setItem(storageKey, configuredApiBaseUrl);
     }
+    function readAdminContext() {
+      try {
+        return Object.assign(
+          { token: "", userId: "", organizationId: "", roles: "super_admin" },
+          JSON.parse(localStorage.getItem(adminStorageKey) || "{}")
+        );
+      } catch (_error) {
+        return { token: "", userId: "", organizationId: "", roles: "super_admin" };
+      }
+    }
 
     let state = {
       apiBaseUrl: configuredApiBaseUrl,
       apiDraft: configuredApiBaseUrl,
+      adminContext: readAdminContext(),
       health: null,
       readiness: null,
       proof: null,
@@ -244,12 +256,33 @@ const html = `<!doctype html>
     function endpoint(path) {
       return state.apiBaseUrl.replace(/\\/$/, "") + "/" + path.replace(/^\\//, "");
     }
+    function hasAdminContext() {
+      return Boolean(
+        state.adminContext.token &&
+        state.adminContext.userId &&
+        state.adminContext.organizationId &&
+        state.adminContext.roles
+      );
+    }
+    function adminHeaders() {
+      if (!hasAdminContext()) {
+        throw new Error("Admin write access is required.");
+      }
+      return {
+        authorization: "Bearer " + state.adminContext.token,
+        "x-trustpass-user-id": state.adminContext.userId,
+        "x-trustpass-organization-id": state.adminContext.organizationId,
+        "x-trustpass-roles": state.adminContext.roles
+      };
+    }
     async function fetchJson(path, options) {
       if (!state.apiBaseUrl) throw new Error("Connect a live API URL first.");
-      const response = await fetch(endpoint(path), Object.assign({
-        headers: { "content-type": "application/json" },
+      const requestOptions = options || {};
+      const requestHeaders = Object.assign({ "content-type": "application/json" }, requestOptions.headers || {});
+      const response = await fetch(endpoint(path), Object.assign({}, requestOptions, {
+        headers: requestHeaders,
         cache: "no-store"
-      }, options || {}));
+      }));
       const body = await response.json().catch(function () { return {}; });
       state.lastRequestId = response.headers.get("x-request-id") || body.request_id || "";
       if (!response.ok) {
@@ -291,6 +324,7 @@ const html = `<!doctype html>
     async function postTrustpass(action, payload) {
       const body = await fetchJson("/api/trustpass", {
         method: "POST",
+        headers: adminHeaders(),
         body: JSON.stringify(Object.assign({ action: action }, payload))
       });
       state.data = Object.assign({}, state.data, body.data || {});
@@ -301,6 +335,13 @@ const html = `<!doctype html>
       if (state.error) return '<span class="api-pill error">' + escapeHtml(state.error) + '</span>';
       if (state.readiness && state.readiness.status === "ready") return '<span class="api-pill connected">Live API ready</span>';
       return '<span class="api-pill">Checking live API</span>';
+    }
+    function adminBadge() {
+      if (hasAdminContext()) return '<span class="api-pill connected">Admin writes enabled</span>';
+      return '<span class="api-pill">Read-only until admin access is configured</span>';
+    }
+    function writeDisabled() {
+      return state.apiBaseUrl && hasAdminContext() ? "" : "disabled";
     }
     function emptyRow(columns, text) {
       return '<tr><td colspan="' + columns + '"><div class="empty">' + escapeHtml(text) + '</div></td></tr>';
@@ -348,16 +389,16 @@ const html = `<!doctype html>
       }).join("");
     }
     function shellIntro() {
-      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page no longer ships fake vendor records. It reads and writes live Render/FastAPI/Postgres records through the deployed TRUSTPASS API.</p>' + statusBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
+      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page no longer ships fake vendor records. It reads live Render/FastAPI/Postgres records through the deployed TRUSTPASS API. Writes require an authorized TRUSTPASS admin context.</p>' + statusBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
     }
     function statusPage() {
       return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section><section class="panel pad"><h2>Operational Proof</h2><p>Fetched from /api/operational-proof on the connected Render API.</p><pre>' + escapeHtml(JSON.stringify(state.proof || {}, null, 2)) + '</pre></section></main>';
     }
     function vendorsPage() {
-      return '<main><div class="eyebrow">Live records</div><h1>Vendors</h1><p>Rows below come from the connected live API only.</p><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Vendor Trust Profiles</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Location</th><th>Trust</th><th>Status</th></tr></thead><tbody>' + vendorRows() + '</tbody></table></div></div><form id="vendor-form" class="panel pad"><h2>Create Vendor</h2><p>Create a real record in the connected live API.</p><div class="form-grid"><label>Name<input name="name" required /></label><label>Category<input name="category" /></label><label>Location<input name="location" /></label><label>Email<input name="contact_email" type="email" /></label><div class="span-2 actions"><button class="button" ' + (state.apiBaseUrl ? "" : "disabled") + '>Create live vendor</button></div></div></form></section></main>';
+      return '<main><div class="eyebrow">Live records</div><h1>Vendors</h1><p>Rows below come from the connected live API only.</p><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Vendor Trust Profiles</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Location</th><th>Trust</th><th>Status</th></tr></thead><tbody>' + vendorRows() + '</tbody></table></div></div><form id="vendor-form" class="panel pad"><h2>Create Vendor</h2><p>Create a real record in the connected live API. Writes require admin access.</p><div class="form-grid"><label>Name<input name="name" required /></label><label>Category<input name="category" /></label><label>Location<input name="location" /></label><label>Email<input name="contact_email" type="email" /></label><div class="span-2 actions"><button class="button" ' + writeDisabled() + '>Create live vendor</button><a class="button secondary" href="#/connect">Admin access</a></div></div></form></section></main>';
     }
     function requestsPage() {
-      const disabled = state.apiBaseUrl ? "" : "disabled";
+      const disabled = writeDisabled();
       const vendorOptions = selectOptions(state.data.vendors, "id", "name", "Create a vendor first");
       const buyerOptions = selectOptions(state.data.buyers, "id", "name", "Create a buyer first");
       return '<main><div class="eyebrow">Buyer workflows</div><h1>Requests</h1><section class="panel"><div class="panel-head"><h2>Buyer Requests</h2></div><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Buyer</th><th>Vendor</th><th>Status</th></tr></thead><tbody>' + requestRows() + '</tbody></table></div></section><section class="grid-2"><form id="buyer-form" class="panel pad"><h2>Create Buyer</h2><p>Create a real buyer organization in the connected live API.</p><div class="form-grid"><label>Name<input name="name" required /></label><label>Email<input name="contact_email" type="email" /></label><label class="span-2">Location<input name="location" /></label><div class="span-2 actions"><button class="button" ' + disabled + '>Create live buyer</button></div></div></form><form id="document-form" class="panel pad"><h2>Add Document Metadata</h2><p>Attach file metadata to a live vendor without storing raw files in the page.</p><div class="form-grid"><label class="span-2">Vendor<select name="vendor_id" required>' + vendorOptions + '</select></label><label>Document name<input name="document_name" required placeholder="Insurance certificate" /></label><label>Status<select name="status"><option value="submitted">Submitted</option><option value="under_review">Under review</option><option value="approved">Approved</option><option value="changes_requested">Changes requested</option><option value="rejected">Rejected</option><option value="expired">Expired</option></select></label><label>Expiry date<input name="expiry_date" type="date" /></label><div class="span-2 actions"><button class="button" ' + disabled + '>Add live document</button></div></div></form></section><section class="grid-2"><form id="buyer-request-form" class="panel pad"><h2>Create Buyer Request</h2><p>Open a real buyer-to-vendor request and notification trail.</p><div class="form-grid"><label>Buyer<select name="buyer_id" required>' + buyerOptions + '</select></label><label>Vendor<select name="vendor_id" required>' + vendorOptions + '</select></label><label class="span-2">Subject<input name="subject" required placeholder="Compliance review request" /></label><label class="span-2">Message<textarea name="message" rows="4"></textarea></label><div class="span-2 actions"><button class="button" ' + disabled + '>Create live request</button></div></div></form><form id="decision-form" class="panel pad"><h2>Record Verification Decision</h2><p>Write the review result, score snapshot, audit event, and notification.</p><div class="form-grid"><label>Vendor<select name="vendor_id" required>' + vendorOptions + '</select></label><label>Status<select name="status"><option value="approved">Approved</option><option value="changes_requested">Changes requested</option><option value="rejected">Rejected</option><option value="expired">Expired</option></select></label><label>Trust score<input name="trust_score" type="number" min="0" max="100" value="82" /></label><label class="span-2">Notes<textarea name="notes" rows="4">Verified from public gateway workflow.</textarea></label><div class="span-2 actions"><button class="button" ' + disabled + '>Record live decision</button></div></div></form></section></main>';
@@ -366,7 +407,7 @@ const html = `<!doctype html>
       return '<main><div class="eyebrow">Operational proof</div><h1>Logs</h1><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Request Logs</h2></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Status</th><th>ID</th><th>Time</th></tr></thead><tbody>' + logRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Audit Events</h2></div><div class="table-wrap"><table><thead><tr><th>Action</th><th>Entity</th><th>Request ID</th><th>Summary</th></tr></thead><tbody>' + auditRows() + '</tbody></table></div></div></section><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Trust Score History</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Score</th><th>Status</th><th>Summary</th></tr></thead><tbody>' + scoreRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Notifications</h2></div><div class="table-wrap"><table><thead><tr><th>Title</th><th>Organization</th><th>Request ID</th><th>Body</th></tr></thead><tbody>' + notificationRows() + '</tbody></table></div></div></section></main>';
     }
     function connectPage() {
-      return '<main><div class="eyebrow">Configuration</div><h1>Connect Live API</h1><section class="panel pad" style="max-width: 780px"><p>Paste the deployed TRUSTPASS API base URL. This page will call /api/health, /api/readiness, /api/trustpass, and /api/operational-proof from that host.</p><form id="api-form" class="form-grid"><label class="span-2">Live API base URL<input name="api_base_url" required value="' + escapeHtml(state.apiDraft || "") + '" placeholder="https://trustpass-api.onrender.com/api/v1" /></label><div class="span-2 actions"><button class="button">Save and test</button><button class="button secondary" type="button" data-action="clear-api">Clear</button></div></form></section></main>';
+      return '<main><div class="eyebrow">Configuration</div><h1>Connect Live API</h1><section class="grid-2"><section class="panel pad"><h2>Live API</h2><p>This page calls /api/health, /api/readiness, /api/trustpass, and /api/operational-proof from the connected host.</p><form id="api-form" class="form-grid"><label class="span-2">Live API base URL<input name="api_base_url" required value="' + escapeHtml(state.apiDraft || "") + '" placeholder="https://trustpass-api.onrender.com/api/v1" /></label><div class="span-2 actions"><button class="button">Save and test</button><button class="button secondary" type="button" data-action="clear-api">Clear</button></div></form></section><section class="panel pad"><h2>Admin Write Access</h2><p>Writes require an authorized TRUSTPASS admin context. Read-only views work without these fields.</p><form id="admin-form" class="form-grid"><label class="span-2">Bearer token<input name="token" value="' + escapeHtml(state.adminContext.token) + '" autocomplete="off" placeholder="Supabase access token or TRUSTPASS admin subject" /></label><label>User ID<input name="user_id" value="' + escapeHtml(state.adminContext.userId) + '" autocomplete="off" /></label><label>Organization ID<input name="organization_id" value="' + escapeHtml(state.adminContext.organizationId) + '" autocomplete="off" /></label><label class="span-2">Roles<input name="roles" value="' + escapeHtml(state.adminContext.roles || "super_admin") + '" autocomplete="off" /></label><div class="span-2 actions"><button class="button">Save admin access</button><button class="button secondary" type="button" data-action="clear-admin">Clear admin access</button></div></form></section></section></main>';
     }
     const pages = {
       "/": statusPage,
@@ -406,6 +447,12 @@ const html = `<!doctype html>
         state.error = "";
         render();
       }
+      if (action === "clear-admin") {
+        localStorage.removeItem(adminStorageKey);
+        state.adminContext = { token: "", userId: "", organizationId: "", roles: "super_admin" };
+        state.error = "";
+        render();
+      }
     });
     document.addEventListener("submit", async function (event) {
       if (event.target.id === "api-form") {
@@ -416,6 +463,19 @@ const html = `<!doctype html>
         localStorage.setItem(storageKey, state.apiBaseUrl);
         await refreshLiveData();
         location.hash = "#/";
+      }
+      if (event.target.id === "admin-form") {
+        event.preventDefault();
+        const form = new FormData(event.target);
+        state.adminContext = {
+          token: String(form.get("token") || "").trim(),
+          userId: String(form.get("user_id") || "").trim(),
+          organizationId: String(form.get("organization_id") || "").trim(),
+          roles: String(form.get("roles") || "").trim() || "super_admin"
+        };
+        localStorage.setItem(adminStorageKey, JSON.stringify(state.adminContext));
+        state.error = "";
+        render();
       }
       if (event.target.id === "vendor-form") {
         event.preventDefault();

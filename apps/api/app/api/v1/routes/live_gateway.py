@@ -4,12 +4,13 @@ import re
 from datetime import date, datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.core.errors import TrustPassError
+from app.core.security import UserContext, get_user_context
 from app.db.session import get_db
 from app.models.audit import ActivityLog, AuditEvent
 from app.models.buyer import BuyerProfile, BuyerVendorRequest
@@ -18,18 +19,22 @@ from app.models.enums import (
     AuditAction,
     BuyerRequestStatus,
     DocumentStatus,
+    MembershipRole,
+    MembershipStatus,
     NotificationChannel,
     NotificationStatus,
     OrganizationType,
+    UserStatus,
     VerificationStatus,
 )
-from app.models.identity import User
+from app.models.identity import Membership, User
 from app.models.notification import Notification
 from app.models.organization import Organization
 from app.models.vendor import VendorProfile
 from app.models.verification import TrustScoreSnapshot, VerificationRequest
 
 router = APIRouter()
+GATEWAY_ADMIN_ROLES = frozenset({MembershipRole.admin, MembershipRole.super_admin})
 
 
 def _response_headers(request_id: str) -> dict[str, str]:
@@ -42,6 +47,46 @@ def _response_headers(request_id: str) -> dict[str, str]:
 
 def _request_id(request: Request) -> str:
     return request.headers.get("x-request-id") or f"live-gateway-{datetime.now(timezone.utc).timestamp()}"
+
+
+def _authorize_gateway_writer(context: UserContext, db: Session) -> User:
+    if not {"admin", "super_admin"}.intersection(context.roles):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+
+    user = db.execute(
+        select(User).where(
+            User.auth_subject_id == context.auth_subject_id,
+            User.status == UserStatus.active,
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active TRUSTPASS user required")
+    if context.user_id is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Authenticated user context required")
+    if context.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Authenticated user context mismatch")
+    if context.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated organization context required",
+        )
+
+    membership = db.execute(
+        select(Membership).where(
+            Membership.user_id == user.id,
+            Membership.role.in_(GATEWAY_ADMIN_ROLES),
+            Membership.status == MembershipStatus.active,
+        )
+    ).scalar_one_or_none()
+    if membership is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active admin membership required")
+    if membership.organization_id != context.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated organization context mismatch",
+        )
+
+    return user
 
 
 def _slugify(value: str) -> str:
@@ -57,13 +102,6 @@ def _unique_slug(db: Session, name: str) -> str:
         suffix += 1
         slug = f"{base}-{suffix}"
     return slug
-
-
-def _seed_admin(db: Session) -> User:
-    user = db.execute(select(User).where(User.auth_subject_id == "seed-admin-2")).scalar_one_or_none()
-    if user is None:
-        raise TrustPassError("Seed admin user is missing", "seed_admin_missing", 409)
-    return user
 
 
 def _category_document_type(db: Session) -> DocumentType:
@@ -359,11 +397,15 @@ async def read_trustpass(request: Request, db: Session = Depends(get_db)) -> JSO
 
 
 @router.post("/trustpass")
-async def write_trustpass(request: Request, db: Session = Depends(get_db)) -> Response:
+async def write_trustpass(
+    request: Request,
+    context: UserContext = Depends(get_user_context),
+    db: Session = Depends(get_db),
+) -> Response:
     request_id = _request_id(request)
     payload = await request.json()
     action = payload.get("action")
-    admin = _seed_admin(db)
+    admin = _authorize_gateway_writer(context, db)
 
     if action == "create_vendor":
         org = Organization(

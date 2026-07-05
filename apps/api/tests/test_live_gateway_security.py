@@ -1,0 +1,160 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from uuid import uuid4
+
+import pytest
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
+
+from app.api.v1.routes.live_gateway import _authorize_gateway_writer
+from app.core.security import UserContext
+from app.main import create_app
+from app.models.enums import MembershipRole, MembershipStatus, UserStatus
+
+
+@dataclass
+class _User:
+    id: object
+    auth_subject_id: str
+    status: UserStatus = UserStatus.active
+
+
+@dataclass
+class _Membership:
+    user_id: object
+    organization_id: object
+    role: MembershipRole
+    status: MembershipStatus = MembershipStatus.active
+
+
+class _ScalarResult:
+    def __init__(self, value):
+        self.value = value
+
+    def scalar_one_or_none(self):
+        return self.value
+
+
+class _FakeDb:
+    def __init__(self, *values):
+        self.values = list(values)
+
+    def execute(self, _statement):
+        return _ScalarResult(self.values.pop(0))
+
+
+def _context(
+    *,
+    roles: tuple[str, ...],
+    auth_subject_id: str = "seed-admin-2",
+    user_id=None,
+    organization_id=None,
+) -> UserContext:
+    return UserContext(
+        auth_subject_id=auth_subject_id,
+        user_id=user_id,
+        organization_id=organization_id,
+        roles=roles,
+    )
+
+
+def test_live_gateway_post_requires_authorization_header() -> None:
+    client = TestClient(create_app())
+
+    response = client.post("/api/v1/api/trustpass", json={"action": "create_vendor"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Missing Authorization header"
+
+
+def test_live_gateway_writer_rejects_non_admin_role() -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        _authorize_gateway_writer(_context(roles=("vendor",)), _FakeDb())
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Admin role required"
+
+
+def test_live_gateway_writer_rejects_unknown_auth_subject() -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        _authorize_gateway_writer(_context(roles=("super_admin",), auth_subject_id="missing-user"), _FakeDb(None))
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Active TRUSTPASS user required"
+
+
+def test_live_gateway_writer_rejects_without_active_admin_membership() -> None:
+    user = _User(id=uuid4(), auth_subject_id="seed-admin-2")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _authorize_gateway_writer(
+            _context(roles=("super_admin",), user_id=user.id, organization_id=uuid4()),
+            _FakeDb(user, None),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Active admin membership required"
+
+
+def test_live_gateway_writer_requires_user_context() -> None:
+    user = _User(id=uuid4(), auth_subject_id="seed-admin-2")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _authorize_gateway_writer(_context(roles=("super_admin",)), _FakeDb(user))
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Authenticated user context required"
+
+
+def test_live_gateway_writer_requires_organization_context() -> None:
+    user = _User(id=uuid4(), auth_subject_id="seed-admin-2")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _authorize_gateway_writer(
+            _context(roles=("super_admin",), user_id=user.id),
+            _FakeDb(user),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Authenticated organization context required"
+
+
+def test_live_gateway_writer_rejects_mismatched_context_user() -> None:
+    user = _User(id=uuid4(), auth_subject_id="seed-admin-2")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _authorize_gateway_writer(
+            _context(roles=("super_admin",), user_id=uuid4()),
+            _FakeDb(user),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Authenticated user context mismatch"
+
+
+def test_live_gateway_writer_rejects_mismatched_context_organization() -> None:
+    user = _User(id=uuid4(), auth_subject_id="seed-admin-2")
+    membership = _Membership(user_id=user.id, organization_id=uuid4(), role=MembershipRole.super_admin)
+
+    with pytest.raises(HTTPException) as exc_info:
+        _authorize_gateway_writer(
+            _context(roles=("super_admin",), user_id=user.id, organization_id=uuid4()),
+            _FakeDb(user, membership),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Authenticated organization context mismatch"
+
+
+def test_live_gateway_writer_accepts_active_admin_membership() -> None:
+    user = _User(id=uuid4(), auth_subject_id="seed-admin-2")
+    organization_id = uuid4()
+    membership = _Membership(user_id=user.id, organization_id=organization_id, role=MembershipRole.super_admin)
+
+    actor = _authorize_gateway_writer(
+        _context(roles=("super_admin",), user_id=user.id, organization_id=organization_id),
+        _FakeDb(user, membership),
+    )
+
+    assert actor is user

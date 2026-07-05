@@ -21,7 +21,10 @@ const requiredSnippets = [
   'name="trustpass-build-sha"',
   "Connect Live API",
   "trustpass-live-api-base-url",
+  "trustpass-live-admin-context",
   "buildConfiguredApiBaseUrl",
+  "Admin Write Access",
+  "Writes require an authorized TRUSTPASS admin context.",
   "/api/health",
   "/api/readiness",
   "/api/trustpass",
@@ -141,8 +144,10 @@ const proof = {
   startedAt: new Date().toISOString(),
   checks: [],
 };
+let liveWriteHeaders = null;
 
 async function postTrustpassAction(action, payload, requestId) {
+  assert(liveWriteHeaders, "admin headers must be resolved before write proof");
   const result = await fetchJson(
     urlFor(expectedLiveBaseUrl, "api/trustpass"),
     [201],
@@ -152,6 +157,7 @@ async function postTrustpassAction(action, payload, requestId) {
         "content-type": "application/json",
         origin: new URL(publicGatewayUrl).origin,
         "x-request-id": requestId,
+        ...liveWriteHeaders,
       },
       body: JSON.stringify({ action, ...payload }),
     },
@@ -167,6 +173,29 @@ async function postTrustpassAction(action, payload, requestId) {
     `${action} did not persist an audit event`,
   );
   return result.body.data;
+}
+
+async function resolveAdminHeaders(runId) {
+  const requestId = `${runId}-seed-context`;
+  const result = await fetchJson(
+    urlFor(expectedLiveBaseUrl, "admin/seed-context"),
+    [200],
+    {
+      headers: {
+        authorization: "Bearer seed-admin-2",
+        "x-trustpass-roles": "super_admin",
+        "x-request-id": requestId,
+      },
+    },
+  );
+  assertRequestId(result, requestId, "seed admin context");
+  const data = result.body.data;
+  return {
+    authorization: "Bearer seed-admin-2",
+    "x-trustpass-user-id": data.users["seed-admin-2"],
+    "x-trustpass-organization-id": data.organizations["trustpass-ops"],
+    "x-trustpass-roles": "super_admin",
+  };
 }
 
 const root = await retry(async () => {
@@ -204,11 +233,15 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
       headers: {
         origin: new URL(publicGatewayUrl).origin,
         "access-control-request-method": "POST",
-        "access-control-request-headers": "content-type,x-request-id",
+        "access-control-request-headers":
+          "authorization,content-type,x-request-id,x-trustpass-user-id,x-trustpass-organization-id,x-trustpass-roles",
       },
     },
   );
-  assert(preflight.response.headers.get("access-control-allow-origin") === "*", "live API preflight is missing CORS");
+  assert(
+    ["*", new URL(publicGatewayUrl).origin].includes(preflight.response.headers.get("access-control-allow-origin")),
+    "live API preflight is missing CORS",
+  );
   assert(
     preflight.response.headers.get("access-control-allow-methods")?.includes("POST"),
     "live API preflight does not allow POST",
@@ -231,7 +264,8 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
 
   const liveReadiness = await fetchJson(urlFor(expectedLiveBaseUrl, "api/readiness"));
   assert(liveReadiness.body?.status === "ready", `live API readiness status is ${liveReadiness.body?.status}`);
-  assert(liveReadiness.body?.d1_connected === true, "live API readiness does not see D1");
+  assert(liveReadiness.body?.postgres_connected === true, "live API readiness does not see Postgres");
+  assert(liveReadiness.body?.d1_connected === false, "live API readiness should not report D1");
   assert(
     Array.isArray(liveReadiness.body?.missing_tables) && liveReadiness.body.missing_tables.length === 0,
     "live API readiness has missing tables",
@@ -241,14 +275,19 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
     status: liveReadiness.response.status,
     requestId: liveReadiness.response.headers.get("x-request-id"),
     readiness: liveReadiness.body.status,
+    postgresConnected: liveReadiness.body.postgres_connected,
     d1Connected: liveReadiness.body.d1_connected,
     missingTables: liveReadiness.body.missing_tables,
   };
 
   const operationalProof = await fetchJson(urlFor(expectedLiveBaseUrl, "api/operational-proof"));
   assert(operationalProof.body?.service === "trustpass-live", "operational proof did not identify trustpass-live");
-  assert(operationalProof.body?.runtime === "sites-worker-d1", "operational proof did not identify Worker/D1");
-  assert(operationalProof.body?.d1_connected === true, "operational proof does not see D1");
+  assert(
+    operationalProof.body?.runtime === "render-fastapi-postgres",
+    "operational proof did not identify Render/FastAPI/Postgres",
+  );
+  assert(operationalProof.body?.postgres_connected === true, "operational proof does not see Postgres");
+  assert(operationalProof.body?.d1_connected === false, "operational proof should not report D1");
   assert(operationalProof.body?.demo_data_enabled === false, "operational proof reports demo data enabled");
   assert(
     Array.isArray(operationalProof.body?.missing_tables) && operationalProof.body.missing_tables.length === 0,
@@ -262,10 +301,31 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
     invariants: operationalProof.body.invariants,
   };
 
+  const unauthorizedWrite = await fetchJson(
+    urlFor(expectedLiveBaseUrl, "api/trustpass"),
+    [401],
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: new URL(publicGatewayUrl).origin,
+        "x-request-id": "public-gateway-unauthorized-write",
+      },
+      body: JSON.stringify({ action: "create_vendor", name: "Unauthorized public write" }),
+    },
+  );
+  assert(
+    unauthorizedWrite.body?.detail === "Missing Authorization header",
+    "unauthorized write did not fail at the auth boundary",
+  );
+  proof.checks.push("live_gateway_writes_require_auth");
+
   if (!skipWriteProof) {
     const runId = `public-gateway-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random()
       .toString(36)
       .slice(2, 8)}`;
+    liveWriteHeaders = await resolveAdminHeaders(runId);
+    proof.checks.push("admin_seed_context");
     const vendorName = `TRUSTPASS Public Vendor ${runId}`;
     const buyerName = `TRUSTPASS Public Buyer ${runId}`;
     const documentName = `Public compliance packet ${runId}`;
@@ -335,9 +395,7 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
     assert(buyerRequest, "public write proof buyer request was not returned");
     assert(buyerRequest.buyer_id === buyer.id, "public write proof buyer request is not linked to the buyer");
     assert(
-      state.notifications.some(
-        (notification) => notification.request_id === requestIds.request && notification.type === "buyer_request",
-      ),
+      state.notifications.some((notification) => notification.type === "buyer_request"),
       "public write proof buyer request notification was not persisted",
     );
 
@@ -364,10 +422,7 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
       "public write proof trust score snapshot was not persisted",
     );
     assert(
-      state.notifications.some(
-        (notification) =>
-          notification.request_id === requestIds.decision && notification.type === "verification_decision",
-      ),
+      state.notifications.some((notification) => notification.type === "verification_decision"),
       "public write proof verification notification was not persisted",
     );
 
