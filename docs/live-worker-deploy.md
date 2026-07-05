@@ -21,6 +21,12 @@ creation, migrations, or Worker upload.
 The workflow can use an existing Cloudflare D1 database ID, or it can resolve an
 existing database by name and create it when it does not exist.
 
+The repository variable `TRUSTPASS_LIVE_BASE_URL` must eventually point to the
+deployed HTTPS Worker URL. Do not set it to GitHub Pages or localhost. The
+`TRUSTPASS Live App` workflow intentionally fails its `Deployed live E2E` job
+until that variable is configured, because a skipped deployed proof would make
+the repository look live when only the local D1 proof has passed.
+
 Cloudflare's Worker CI/CD guide documents the same secret boundary for
 non-interactive Wrangler deploys. Cloudflare's D1 migration guide documents
 `migrations_dir` inside the D1 binding, which is why the workflow patches the
@@ -43,8 +49,9 @@ Use these inputs:
 
 The workflow resolves or creates the D1 database, installs the live app, builds
 the Worker bundle, patches the generated `dist/server/wrangler.json` with the
-real Worker and D1 binding, applies the D1 migrations, deploys the Worker, runs
-the deployed E2E proof against the resolved Worker URL, persists
+real Worker and D1 binding, applies the D1 migrations, deploys the Worker,
+resolves and validates the HTTPS Worker URL, runs the deployed E2E proof against
+that URL, persists
 `TRUSTPASS_LIVE_BASE_URL` for future pushes when the GitHub token has variable
 write access, then publishes the GitHub Pages gateway preconnected to the
 deployed Worker URL.
@@ -55,6 +62,7 @@ The deployed proof checks:
 
 - `GET /api/health`
 - `GET /api/readiness`
+- health identity `service: trustpass-live` and `runtime: sites-worker-d1`
 - CORS preflight for the public Pages origin
 - root app renders the live operations UI
 - no seeded demo/vendor strings are present
@@ -69,9 +77,10 @@ IDs/names, final persisted record counts, readiness evidence, and completed
 checks.
 
 After the Worker is live, set repository variable `TRUSTPASS_LIVE_BASE_URL` to
-the same Worker URL. The existing `TRUSTPASS Live App` workflow will then run
-the deployed-live acceptance check on future pushes, and ordinary Pages builds
-will keep embedding that URL as the default public gateway connection.
+the same Worker URL if the deploy workflow could not save it automatically. The
+existing `TRUSTPASS Live App` workflow will then run the deployed-live
+acceptance check on future pushes, and ordinary Pages builds will keep embedding
+that URL as the default public gateway connection.
 
 ## Public Site Wiring
 
@@ -96,9 +105,10 @@ preconnected to the Worker URL, free of seeded demo strings, and still serving
 `/api/health` as a static 404 rather than a fake API.
 
 Use the manual `Verify TRUSTPASS Live URL` workflow to re-run the deployed API
-and public gateway proofs against any Worker URL without redeploying. It uploads
-separate `trustpass-live-url-api-proof` and
-`trustpass-live-url-public-gateway-proof` artifacts.
+and public gateway proofs against any Worker URL without redeploying. It rejects
+GitHub Pages and localhost before running the E2E proof, then uploads separate
+`trustpass-live-url-api-proof` and `trustpass-live-url-public-gateway-proof`
+artifacts.
 
 ## References
 

@@ -67,16 +67,22 @@ make api-seed
 - Email: Resend or Postmark.
 - Billing: Stripe and/or Razorpay.
 
-## Current Public Demo
+## Current Public Gateway
 
-The public demo is served by GitHub Pages from the `gh-pages` branch:
+The public gateway is served by GitHub Pages from the `gh-pages` branch:
 
 - URL: `https://bksingh9.github.io/trustpass/`
 - Source: `apps/web/scripts/build-pages.mjs`
 - CI/deploy workflow: `.github/workflows/pages.yml`
 - Browser behavior: single-page app fallback via matching `index.html` and `404.html`
 
-GitHub Pages is static hosting, so it does not run the FastAPI backend. The repository keeps the backend end-to-end proof under `/api/v1/demo/*` for local, container, and CI verification until a real API host is attached.
+GitHub Pages is static hosting, so it does not run the API or write to a
+database. It must point at the deployed Worker/D1 API through
+`TRUSTPASS_LIVE_BASE_URL` before it counts as a live real-data surface.
+The same-origin Pages path `https://bksingh9.github.io/trustpass/api/health`
+must remain a static `404`; the real live API is the separate Cloudflare Worker
+URL verified by `.github/workflows/live-app.yml` and
+`.github/workflows/deploy-live-worker.yml`.
 
 ## Real-Data API Verification
 
