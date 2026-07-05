@@ -29,6 +29,7 @@ on:
         type: string
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -98,6 +99,14 @@ jobs:
       - name: Verify public gateway artifact
         working-directory: .
         run: node apps/web/scripts/e2e-static.mjs
+
+      - name: Persist deployed API URL for future checks
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TRUSTPASS_VARIABLE_NAME: TRUSTPASS_LIVE_BASE_URL
+          TRUSTPASS_VARIABLE_VALUE: ${{ inputs.live_base_url }}
+        run: node scripts/upsert-github-actions-variable.mjs
 
       - name: Publish preconnected public gateway
         if: github.ref == 'refs/heads/main'
