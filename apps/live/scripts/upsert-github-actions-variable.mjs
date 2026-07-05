@@ -63,7 +63,7 @@ function summarizeError(body, fallback) {
 async function main() {
   const { owner, repo } = parseRepository(requiredEnv("GITHUB_REPOSITORY"));
   const name = readEnv("TRUSTPASS_VARIABLE_NAME", "TRUSTPASS_LIVE_BASE_URL");
-  const value = requiredEnv("TRUSTPASS_VARIABLE_VALUE");
+  const value = readEnv("TRUSTPASS_VARIABLE_VALUE") || requiredEnv("TRUSTPASS_LIVE_BASE_URL");
 
   validateVariableName(name);
 

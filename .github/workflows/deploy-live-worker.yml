@@ -24,8 +24,9 @@ on:
         default: ""
         type: string
       live_base_url:
-        description: Public deployed Worker URL, ending at the app root.
-        required: true
+        description: Optional public Worker URL. Leave blank to parse it from Wrangler deploy output.
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -87,7 +88,13 @@ jobs:
         run: npx wrangler d1 migrations apply "${TRUSTPASS_D1_DATABASE_NAME}" --remote --config dist/server/wrangler.json
 
       - name: Deploy Worker
-        run: npx wrangler deploy --config dist/server/wrangler.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --config dist/server/wrangler.json 2>&1 | tee deploy-output.log
+
+      - name: Resolve deployed API URL
+        run: node scripts/resolve-live-base-url.mjs --deploy-log deploy-output.log
 
       - name: Run deployed live E2E proof
         run: npm run e2e:live
@@ -105,7 +112,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           TRUSTPASS_VARIABLE_NAME: TRUSTPASS_LIVE_BASE_URL
-          TRUSTPASS_VARIABLE_VALUE: ${{ inputs.live_base_url }}
         run: node scripts/upsert-github-actions-variable.mjs
 
       - name: Publish preconnected public gateway

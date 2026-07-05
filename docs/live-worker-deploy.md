@@ -34,15 +34,16 @@ Use these inputs:
 - `d1_database_id`: optional existing D1 database ID; leave blank to resolve or
   create by name
 - `d1_primary_location_hint`: optional D1 location hint
-- `live_base_url`: the deployed Worker URL, for example
-  `https://trustpass-live.<account>.workers.dev/`
+- `live_base_url`: optional deployed Worker URL. Leave blank to parse the URL
+  from Wrangler deploy output.
 
 The workflow resolves or creates the D1 database, installs the live app, builds
 the Worker bundle, patches the generated `dist/server/wrangler.json` with the
 real Worker and D1 binding, applies the D1 migrations, deploys the Worker, runs
-the deployed E2E proof, persists `TRUSTPASS_LIVE_BASE_URL` for future pushes
-when the GitHub token has variable write access, then publishes the GitHub Pages
-gateway preconnected to the deployed Worker URL.
+the deployed E2E proof against the resolved Worker URL, persists
+`TRUSTPASS_LIVE_BASE_URL` for future pushes when the GitHub token has variable
+write access, then publishes the GitHub Pages gateway preconnected to the
+deployed Worker URL.
 
 ## Acceptance Proof
 
