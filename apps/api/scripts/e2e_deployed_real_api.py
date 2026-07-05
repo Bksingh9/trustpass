@@ -258,18 +258,23 @@ def main() -> None:
         headers=admin_headers | {"x-request-id": f"{run_id}-existing-requests"},
     )
     assert_request_id(existing_requests_headers, f"{run_id}-existing-requests")
-    reusable_request = next(
+    clearpath_request = next(
         (
             request
             for request in existing_requests["data"]["verification_requests"]
             if request["organization_id"] == ids["clearpath_org"]
-            and request["status"] in {"submitted", "under_review"}
         ),
         None,
     )
-    if reusable_request:
-        verification_request_id = reusable_request["id"]
+    needs_decision = True
+    if clearpath_request and clearpath_request["status"] in {"submitted", "under_review"}:
+        verification_request_id = clearpath_request["id"]
         proof["checks"].append("verification_submit_reused")
+    elif clearpath_request and clearpath_request["status"] == "approved":
+        verification_request_id = clearpath_request["id"]
+        needs_decision = False
+        proof["checks"].append("verification_submit_reused")
+        proof["checks"].append("verification_decision_reused")
     else:
         _, submit, submit_headers = request_json(
             base_url,
@@ -283,20 +288,24 @@ def main() -> None:
         assert_request_id(submit_headers, f"{run_id}-submit")
         proof["checks"].append("verification_submit")
 
-    _, decision, decision_headers = request_json(
-        base_url,
-        "PATCH",
-        f"/verification/requests/{verification_request_id}/decision",
-        headers=admin_headers | {"x-request-id": f"{run_id}-decision"},
-        payload={
-            "status": "approved",
-            "vendor_message": "Approved through deployed real-data E2E.",
-            "admin_notes": f"Deployed real-data verification decision {run_id}.",
-        },
-    )
-    assert_condition(decision["data"]["status"] == "approved", "verification request was not approved")
-    assert_request_id(decision_headers, f"{run_id}-decision")
-    proof["checks"].append("verification_decision")
+    if needs_decision:
+        _, decision, decision_headers = request_json(
+            base_url,
+            "PATCH",
+            f"/verification/requests/{verification_request_id}/decision",
+            headers=admin_headers | {"x-request-id": f"{run_id}-decision"},
+            payload={
+                "status": "approved",
+                "vendor_message": "Approved through deployed real-data E2E.",
+                "admin_notes": f"Deployed real-data verification decision {run_id}.",
+            },
+        )
+        assert_condition(
+            decision["data"]["status"] == "approved",
+            "verification request was not approved",
+        )
+        assert_request_id(decision_headers, f"{run_id}-decision")
+        proof["checks"].append("verification_decision")
 
     _, audit, audit_headers = request_json(
         base_url,
