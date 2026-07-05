@@ -39,8 +39,9 @@ Use these inputs:
 
 The workflow resolves or creates the D1 database, installs the live app, builds
 the Worker bundle, patches the generated `dist/server/wrangler.json` with the
-real Worker and D1 binding, applies the D1 migrations, deploys the Worker, and
-runs the deployed E2E proof.
+real Worker and D1 binding, applies the D1 migrations, deploys the Worker, runs
+the deployed E2E proof, then publishes the GitHub Pages gateway preconnected to
+the deployed Worker URL.
 
 ## Acceptance Proof
 
@@ -57,8 +58,8 @@ The deployed proof checks:
 
 After the Worker is live, set repository variable `TRUSTPASS_LIVE_BASE_URL` to
 the same Worker URL. The existing `TRUSTPASS Live App` workflow will then run
-the deployed-live acceptance check on future pushes, and the Pages build will
-embed that URL as the default public gateway connection.
+the deployed-live acceptance check on future pushes, and ordinary Pages builds
+will keep embedding that URL as the default public gateway connection.
 
 ## Public Site Wiring
 
@@ -70,6 +71,10 @@ When repository variable `TRUSTPASS_LIVE_BASE_URL` is set before the Pages
 workflow runs, the public gateway is preconnected to that Worker URL. The manual
 connection form remains available as an override for testing a different live
 host.
+
+The deploy workflow also publishes the gateway immediately after live E2E passes,
+using its `live_base_url` input. That means a successful production deploy does
+not require a separate Pages rebuild before the public site can use the live API.
 
 ## References
 

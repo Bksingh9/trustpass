@@ -29,7 +29,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: trustpass-live-worker
@@ -90,3 +90,42 @@ jobs:
 
       - name: Run deployed live E2E proof
         run: npm run e2e:live
+
+      - name: Build public gateway for deployed API
+        working-directory: .
+        run: node apps/web/scripts/build-pages.mjs
+
+      - name: Verify public gateway artifact
+        working-directory: .
+        run: node apps/web/scripts/e2e-static.mjs
+
+      - name: Publish preconnected public gateway
+        if: github.ref == 'refs/heads/main'
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_dir="$(mktemp -d)"
+          cp -R apps/web/pages/. "$deploy_dir/"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages || true
+
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git switch --detach origin/gh-pages
+          else
+            git switch --orphan gh-pages
+          fi
+
+          git rm -r --ignore-unmatch .
+          cp -R "$deploy_dir"/. .
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No Pages changes to publish."
+            exit 0
+          fi
+
+          git commit -m "Deploy live TRUSTPASS gateway for ${GITHUB_SHA}"
+          git push origin HEAD:gh-pages
