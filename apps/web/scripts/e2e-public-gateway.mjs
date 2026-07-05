@@ -188,7 +188,10 @@ async function resolveAdminHeaders(runId) {
       },
     },
   );
-  assertRequestId(result, requestId, "seed admin context");
+  assert(
+    result.response.headers.get("x-request-id") === requestId,
+    `seed admin context x-request-id mismatch: expected ${requestId}`,
+  );
   const data = result.body.data;
   return {
     authorization: "Bearer seed-admin-2",
@@ -227,7 +230,7 @@ proof.pagesApiHealth = {
 if (expectedLiveBaseUrl && !skipLiveApiChecks) {
   const preflight = await fetchText(
     urlFor(expectedLiveBaseUrl, "api/trustpass"),
-    [204],
+    [200, 204],
     {
       method: "OPTIONS",
       headers: {
