@@ -16,30 +16,30 @@ const notFoundHtml = readFileSync(notFoundPath, "utf8");
 
 const requiredSnippets = [
   "<title>TRUSTPASS</title>",
-  "Vendor trust workspace",
-  "Verified vendor search",
-  "Verification review queue",
-  "Vendor Basic",
-  "Request a demo",
-  "Submit renewal",
-  "Shortlist",
-  "Request",
-  "Send request",
-  "Reset",
-  "vendor-search",
-  "category-filter",
+  "TRUSTPASS Live Gateway",
+  "Connect Live API",
+  "trustpass-live-api-base-url",
+  "/api/health",
+  "/api/readiness",
+  "/api/trustpass",
+  "Create Vendor",
+  "Vendor Trust Profiles",
+  "Request Logs",
+  "Audit Events",
+  "addEventListener(\"hashchange\", render)",
+];
+
+const forbiddenSnippets = [
+  "Seeded TRUSTPASS demo data",
   "trustpass-demo-state",
   "TRUSTPASS_DEMO_RESET",
-  "trustpass-api-base-url",
-  "/demo/vendor/renewal",
-  "/demo/buyers/shortlists",
-  "/demo/admin/reviews/",
-  "/demo/contact/demo-requests",
   "demo@trustpass.local",
+  "/demo/",
   "Atlas Freight Partners",
   "Northstar Digital Studio",
   "Clearpath Advisory",
-  "addEventListener(\"hashchange\", render)",
+  "Priya Shah",
+  "Acme Procurement",
 ];
 
 function assert(condition, message) {
@@ -49,7 +49,11 @@ function assert(condition, message) {
 }
 
 for (const snippet of requiredSnippets) {
-  assert(indexHtml.includes(snippet), `Missing static content: ${snippet}`);
+  assert(indexHtml.includes(snippet), "Missing static content: " + snippet);
+}
+
+for (const snippet of forbiddenSnippets) {
+  assert(!indexHtml.includes(snippet), "Static artifact still contains forbidden content: " + snippet);
 }
 
 assert(notFoundHtml === indexHtml, "404.html must match index.html for SPA fallback");
@@ -58,7 +62,7 @@ const server = http.createServer((request, response) => {
   const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
   const relativePath = requestUrl.pathname === "/" ? "index.html" : requestUrl.pathname.slice(1);
   const candidatePath = path.resolve(pagesRoot, relativePath);
-  const isInsidePagesRoot = candidatePath === pagesRoot || candidatePath.startsWith(`${pagesRoot}${path.sep}`);
+  const isInsidePagesRoot = candidatePath === pagesRoot || candidatePath.startsWith(pagesRoot + path.sep);
   const filePath =
     isInsidePagesRoot && existsSync(candidatePath) && statSync(candidatePath).isFile()
       ? candidatePath
@@ -72,15 +76,17 @@ await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 
 try {
   const { port } = server.address();
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const baseUrl = "http://127.0.0.1:" + port;
   const paths = ["/", "/index.html", "/404.html", "/unknown/path"];
 
   for (const routePath of paths) {
-    const response = await fetch(`${baseUrl}${routePath}`);
+    const response = await fetch(baseUrl + routePath);
     const body = await response.text();
-    assert(response.status === 200, `${routePath} returned ${response.status}`);
-    assert(body.includes("TRUSTPASS"), `${routePath} did not render TRUSTPASS`);
-    assert(body.includes("Atlas Freight Partners"), `${routePath} did not include seeded vendors`);
+    assert(response.status === 200, routePath + " returned " + response.status);
+    assert(body.includes("TRUSTPASS Live Gateway"), routePath + " did not render live gateway");
+    for (const snippet of forbiddenSnippets) {
+      assert(!body.includes(snippet), routePath + " contains forbidden content: " + snippet);
+    }
   }
 } finally {
   await new Promise((resolve, reject) => {

@@ -19,7 +19,10 @@ const webResponse = await fetch(`${webBaseUrl}/?api=${encodedApiBaseUrl}#/`);
 const webHtml = await webResponse.text();
 assert(webResponse.status === 200, `web returned ${webResponse.status}`);
 assert(webHtml.includes("TRUSTPASS"), "web did not serve TRUSTPASS");
-assert(webHtml.includes("trustpass-api-base-url"), "web is missing API mode wiring");
+assert(webHtml.includes("TRUSTPASS Live Gateway"), "web did not serve the live gateway");
+assert(webHtml.includes("trustpass-live-api-base-url"), "web is missing live API wiring");
+assert(!webHtml.includes("Seeded TRUSTPASS demo data"), "web still embeds seeded static data");
+assert(!webHtml.includes("Atlas Freight Partners"), "web still embeds seeded vendor data");
 
 const health = await getJson(`${apiBaseUrl}/health`);
 assert(health.status === "ok", "API health did not return ok");

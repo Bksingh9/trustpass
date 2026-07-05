@@ -73,4 +73,5 @@ jobs:
       - name: Verify deployed live API and data path
         env:
           TRUSTPASS_LIVE_BASE_URL: ${{ vars.TRUSTPASS_LIVE_BASE_URL }}
+          TRUSTPASS_REQUIRE_CORS_PREFLIGHT: "1"
         run: npm run e2e:live

@@ -24,10 +24,18 @@ function responseInit(requestId: string, status = 200): ResponseInit {
   return {
     status,
     headers: {
+      "access-control-allow-headers": "content-type,x-request-id",
+      "access-control-allow-methods": "GET,OPTIONS",
+      "access-control-allow-origin": "*",
       "cache-control": "no-store",
       "x-request-id": requestId,
     },
   };
+}
+
+export async function OPTIONS(request: Request) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  return new Response(null, responseInit(requestId, 204));
 }
 
 export async function GET(request: Request) {

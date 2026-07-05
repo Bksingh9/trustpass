@@ -122,9 +122,31 @@ const summary = {
 
 const health = await retry(async () => request("api/health"), "TRUSTPASS live health");
 assertRequestId(health);
+assert(health.response.headers.get("access-control-allow-origin") === "*", "health response is missing CORS");
 assert(health.body?.service === "trustpass-live", "health did not identify trustpass-live service");
 assert(health.body?.demo_data_enabled === false, "health reports demo data enabled");
 summary.checks.push("health");
+
+if (process.env.TRUSTPASS_REQUIRE_CORS_PREFLIGHT === "1") {
+  const preflight = await request(
+    "api/trustpass",
+    {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://bksingh9.github.io",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-request-id",
+      },
+    },
+    [204],
+  );
+  assert(preflight.response.headers.get("access-control-allow-origin") === "*", "preflight is missing CORS");
+  assert(
+    preflight.response.headers.get("access-control-allow-methods")?.includes("POST"),
+    "preflight does not allow POST",
+  );
+  summary.checks.push("cors_preflight");
+}
 
 const page = await request("");
 assert(page.text.includes("TRUSTPASS Live Operations"), "root page is not the live operations app");

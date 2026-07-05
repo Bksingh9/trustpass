@@ -17,14 +17,13 @@ const html = `<!doctype html>
   <title>TRUSTPASS</title>
   <style>
     :root {
-      --bg: #f8fafc;
+      --bg: #f7f9fb;
       --panel: #ffffff;
       --ink: #162033;
-      --muted: #657084;
+      --muted: #667085;
       --border: #d8dee8;
       --accent: #147461;
       --accent-soft: #e6f4ef;
-      --warning: #a15c07;
       --danger: #b42318;
       --focus: #2f80ed;
     }
@@ -35,8 +34,8 @@ const html = `<!doctype html>
       color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    a { color: inherit; text-decoration: none; }
     button, input, select, textarea { font: inherit; }
+    a { color: inherit; text-decoration: none; }
     header {
       min-height: 64px;
       border-bottom: 1px solid var(--border);
@@ -50,25 +49,22 @@ const html = `<!doctype html>
       top: 0;
       z-index: 5;
     }
-    .brand { font-weight: 800; letter-spacing: 0; }
+    .brand { font-weight: 850; letter-spacing: 0; }
     nav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-    nav a, nav button {
+    nav a {
       padding: 10px 12px;
       border-radius: 6px;
       color: var(--muted);
       font-size: 14px;
-      font-weight: 700;
-      border: 0;
-      background: transparent;
-      cursor: pointer;
+      font-weight: 750;
     }
-    nav a:hover, nav a.active, nav button:hover { background: #eef2f6; color: var(--ink); }
+    nav a:hover, nav a.active { background: #eef2f6; color: var(--ink); }
     main { max-width: 1180px; margin: 0 auto; padding: 30px 24px 56px; }
-    h1 { margin: 8px 0 0; font-size: 40px; line-height: 1.08; letter-spacing: 0; }
+    h1 { margin: 8px 0 0; font-size: 38px; line-height: 1.08; letter-spacing: 0; }
     h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
     h3 { margin: 0; font-size: 15px; letter-spacing: 0; }
     p { color: var(--muted); line-height: 1.6; }
-    label { color: var(--muted); display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+    label { color: var(--muted); display: grid; gap: 6px; font-size: 13px; font-weight: 750; }
     input, select, textarea {
       width: 100%;
       border: 1px solid var(--border);
@@ -78,38 +74,19 @@ const html = `<!doctype html>
       padding: 10px 12px;
       min-height: 40px;
     }
-    textarea { min-height: 112px; resize: vertical; }
     input:focus, select:focus, textarea:focus, button:focus, a:focus {
       outline: 2px solid var(--focus);
       outline-offset: 2px;
     }
-    .eyebrow { color: var(--accent); font-weight: 800; font-size: 14px; }
+    .eyebrow { color: var(--accent); font-weight: 850; font-size: 14px; }
     .hero {
       display: grid;
-      grid-template-columns: 1.05fr 0.95fr;
+      grid-template-columns: 1fr minmax(320px, 0.7fr);
       gap: 24px;
       align-items: stretch;
       padding: 20px 0 28px;
       border-bottom: 1px solid var(--border);
     }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 40px;
-      padding: 0 15px;
-      border-radius: 6px;
-      border: 1px solid var(--accent);
-      background: var(--accent);
-      color: white;
-      font-weight: 800;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    .button.secondary { background: white; color: var(--ink); border-color: var(--border); }
-    .button.ghost { background: transparent; color: var(--accent); border-color: transparent; padding: 0 8px; }
-    .button:disabled { opacity: 0.56; cursor: not-allowed; }
     .panel {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -126,16 +103,30 @@ const html = `<!doctype html>
       gap: 16px;
       align-items: center;
     }
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); overflow: hidden; margin-top: 24px; }
+    .grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; margin-top: 20px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); overflow: hidden; margin-top: 20px; }
     .stat { padding: 18px 20px; border-right: 1px solid var(--border); }
     .stat:last-child { border-right: 0; }
-    .stat span { color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 800; }
+    .stat span { color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 850; }
     .stat strong { display: block; margin-top: 4px; font-size: 28px; }
-    .grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 24px; margin-top: 24px; align-items: start; }
-    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-    .grid-2 > *, .grid-3 > *, .hero > * { min-width: 0; }
-    .filters { display: grid; grid-template-columns: minmax(220px, 1fr) 210px 130px; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); align-items: end; }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 15px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: white;
+      font-weight: 850;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .button.secondary { background: white; color: var(--ink); border-color: var(--border); }
+    .button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .span-2 { grid-column: 1 / -1; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th {
@@ -156,24 +147,11 @@ const html = `<!doctype html>
       padding: 5px 8px;
       background: var(--accent-soft);
       color: #09664f;
-      font-weight: 800;
+      font-weight: 850;
       font-size: 12px;
       white-space: nowrap;
     }
-    .badge.warn { background: #fff7e6; color: var(--warning); }
-    .badge.danger { background: #fff0ed; color: var(--danger); }
-    .list { display: grid; gap: 10px; padding: 18px 20px; }
-    .row { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
-    .row strong { color: var(--ink); }
-    .notice {
-      border: 1px solid #b7e4d5;
-      background: #eefbf6;
-      color: #075a46;
-      border-radius: 6px;
-      padding: 12px 14px;
-      font-weight: 700;
-      margin-top: 14px;
-    }
+    .badge.error { background: #fff0ed; color: var(--danger); }
     .api-pill {
       display: inline-flex;
       align-items: center;
@@ -185,17 +163,17 @@ const html = `<!doctype html>
       background: white;
       color: var(--muted);
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 850;
     }
     .api-pill.connected { border-color: #b7e4d5; color: #075a46; background: #eefbf6; }
     .api-pill.error { border-color: #ffd5cc; color: var(--danger); background: #fff0ed; }
-    .empty { color: var(--muted); padding: 14px 0; }
+    .empty { color: var(--muted); padding: 18px 20px; }
     @media (max-width: 900px) {
       header { padding: 12px 16px; align-items: flex-start; flex-direction: column; }
       nav { justify-content: flex-start; }
-      .hero, .grid-2, .grid-3, .filters, .form-grid { grid-template-columns: 1fr; }
+      .hero, .grid-2, .form-grid { grid-template-columns: 1fr; }
       .stats { grid-template-columns: repeat(2, 1fr); }
-      h1 { font-size: 32px; }
+      h1 { font-size: 31px; }
       main { padding: 24px 16px 44px; }
       table { min-width: 760px; }
     }
@@ -205,242 +183,166 @@ const html = `<!doctype html>
   <header>
     <a class="brand" href="#/">TRUSTPASS</a>
     <nav id="nav">
-      <a href="#/vendor">Vendor</a>
-      <a href="#/buyer">Buyer</a>
-      <a href="#/admin">Admin</a>
-      <a href="#/pricing">Pricing</a>
-      <a href="#/contact">Contact</a>
-      <button type="button" data-action="reset-demo">Reset</button>
+      <a href="#/">Status</a>
+      <a href="#/vendors">Vendors</a>
+      <a href="#/requests">Requests</a>
+      <a href="#/logs">Logs</a>
+      <a href="#/connect">Connect</a>
     </nav>
   </header>
   <div id="app"></div>
   <script>
-    const defaults = {
-      search: "",
-      category: "All",
-      shortlists: [],
-      requests: [],
-      renewalSubmitted: false,
-      contactSuccess: "",
-      apiStatus: "",
-      apiError: "",
-      documents: [
-        { name: "Business registration", status: "Approved", expiry: "2027-03-30" },
-        { name: "GST certificate", status: "Approved", expiry: "2027-03-30" },
-        { name: "Insurance certificate", status: "Renewal due", expiry: "2026-08-15" }
-      ],
-      queue: [
-        { id: "vr-1007", vendor: "Northstar Digital Studio", category: "Digital services", submitted: "2026-06-27", documents: 7, risk: "Medium", status: "Under review" },
-        { id: "vr-1008", vendor: "Clearpath Advisory", category: "Consulting", submitted: "2026-06-29", documents: 4, risk: "High", status: "Changes requested" }
-      ],
-      demoRequests: []
-    };
-    const vendors = [
-      { id: "atlas-freight-partners", name: "Atlas Freight Partners", category: "Logistics", location: "Mumbai, IN", score: 88, level: "Trusted", status: "Approved", badges: "Verified, Insurance checked" },
-      { id: "northstar-digital-studio", name: "Northstar Digital Studio", category: "Digital services", location: "Bengaluru, IN", score: 73, level: "Verified", status: "Under review", badges: "Identity checked" },
-      { id: "clearpath-advisory", name: "Clearpath Advisory", category: "Consulting", location: "Delhi, IN", score: 42, level: "In review", status: "Changes requested", badges: "None" }
-    ];
     const runtimeParams = new URLSearchParams(location.search);
-    const configuredApiBaseUrl = (runtimeParams.get("api") || localStorage.getItem("trustpass-api-base-url") || "").replace(/\\/$/, "");
+    const storageKey = "trustpass-live-api-base-url";
+    const configuredApiBaseUrl = (runtimeParams.get("api") || localStorage.getItem(storageKey) || "").replace(/\\/$/, "");
     if (runtimeParams.get("api")) {
-      localStorage.setItem("trustpass-api-base-url", configuredApiBaseUrl);
+      localStorage.setItem(storageKey, configuredApiBaseUrl);
     }
-    let state = loadState();
 
-    function clone(value) {
-      return JSON.parse(JSON.stringify(value));
+    let state = {
+      apiBaseUrl: configuredApiBaseUrl,
+      apiDraft: configuredApiBaseUrl,
+      health: null,
+      readiness: null,
+      data: {
+        vendors: [],
+        buyers: [],
+        documents: [],
+        buyer_requests: [],
+        verification_decisions: [],
+        audit_events: [],
+        request_logs: []
+      },
+      loading: false,
+      error: "",
+      lastRequestId: ""
+    };
+
+    function escapeHtml(value) {
+      return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
+      });
     }
-    function loadState() {
-      try {
-        const stored = JSON.parse(localStorage.getItem("trustpass-demo-state") || "{}");
-        return Object.assign(clone(defaults), stored);
-      } catch (error) {
-        return clone(defaults);
-      }
-    }
-    function saveState() {
-      localStorage.setItem("trustpass-demo-state", JSON.stringify(state));
-    }
-    function resetState() {
-      state = clone(defaults);
-      saveState();
-      render();
-    }
-    function apiEnabled() {
-      return Boolean(configuredApiBaseUrl);
-    }
-    async function apiRequest(path, options) {
-      if (!apiEnabled()) return null;
-      const response = await fetch(configuredApiBaseUrl + path, Object.assign({
-        headers: { "content-type": "application/json" }
-      }, options || {}));
-      if (!response.ok) {
-        throw new Error("API " + path + " returned " + response.status);
-      }
-      const body = await response.json();
-      return body.data;
-    }
-    function humanStatus(value) {
-      const labels = {
-        approved: "Approved",
-        changes_requested: "Changes requested",
-        high: "High",
-        low: "Low",
-        medium: "Medium",
-        open: "Open",
-        renewal_due: "Renewal due",
-        submitted: "Submitted",
-        under_review: "Under review"
-      };
-      if (labels[value]) return labels[value];
+    function human(value) {
       return String(value || "").split("_").filter(Boolean).map(function (part) {
         return part.charAt(0).toUpperCase() + part.slice(1);
       }).join(" ");
     }
-    function vendorByName(name) {
-      return vendors.find(function (vendor) { return vendor.name === name; });
+    function endpoint(path) {
+      return state.apiBaseUrl.replace(/\\/$/, "") + "/" + path.replace(/^\\//, "");
     }
-    function applyApiState(apiState) {
-      if (!apiState) return;
-      state.documents = (apiState.documents || state.documents).map(function (doc) {
-        return { name: doc.name, status: humanStatus(doc.status), expiry: doc.expiry };
-      });
-      state.queue = (apiState.review_queue || state.queue).map(function (item) {
-        return {
-          id: item.id,
-          vendor: item.vendor_name,
-          category: item.category,
-          submitted: item.submitted_at,
-          documents: item.documents,
-          risk: humanStatus(item.risk),
-          status: humanStatus(item.status)
-        };
-      });
-      state.shortlists = (apiState.shortlists || []).map(function (item) { return item.vendor_name; });
-      state.requests = (apiState.buyer_requests || []).map(function (item) { return item.vendor_name; });
-      state.demoRequests = apiState.demo_requests || state.demoRequests;
-      state.renewalSubmitted = state.documents.some(function (doc) {
-        return doc.name === "Insurance certificate" && doc.status === "Submitted";
-      });
-      state.apiStatus = "API connected";
-      state.apiError = "";
-    }
-    async function refreshFromApi() {
-      if (!apiEnabled()) return;
-      try {
-        applyApiState(await apiRequest("/demo/state"));
-      } catch (error) {
-        state.apiStatus = "API unavailable";
-        state.apiError = error.message;
+    async function fetchJson(path, options) {
+      if (!state.apiBaseUrl) throw new Error("Connect a live API URL first.");
+      const response = await fetch(endpoint(path), Object.assign({
+        headers: { "content-type": "application/json" },
+        cache: "no-store"
+      }, options || {}));
+      const body = await response.json().catch(function () { return {}; });
+      state.lastRequestId = response.headers.get("x-request-id") || body.request_id || "";
+      if (!response.ok) {
+        throw new Error(body.error || path + " returned " + response.status);
       }
-      saveState();
+      return body;
+    }
+    function totals() {
+      return [
+        ["Vendors", state.data.vendors.length],
+        ["Buyers", state.data.buyers.length],
+        ["Documents", state.data.documents.length],
+        ["Requests", state.data.buyer_requests.length]
+      ];
+    }
+    async function refreshLiveData() {
+      if (!state.apiBaseUrl) {
+        render();
+        return;
+      }
+      state.loading = true;
+      state.error = "";
+      render();
+      try {
+        state.health = await fetchJson("/api/health");
+        state.readiness = await fetchJson("/api/readiness");
+        const current = await fetchJson("/api/trustpass");
+        state.data = current.data;
+      } catch (error) {
+        state.error = error.message;
+      } finally {
+        state.loading = false;
+        render();
+      }
+    }
+    async function postTrustpass(action, payload) {
+      const body = await fetchJson("/api/trustpass", {
+        method: "POST",
+        body: JSON.stringify(Object.assign({ action: action }, payload))
+      });
+      state.data = body.data;
       render();
     }
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>"']/g, function (char) {
-        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
-      });
+    function statusBadge() {
+      if (!state.apiBaseUrl) return '<span class="api-pill">Live API not connected</span>';
+      if (state.error) return '<span class="api-pill error">' + escapeHtml(state.error) + '</span>';
+      if (state.readiness && state.readiness.status === "ready") return '<span class="api-pill connected">Live API ready</span>';
+      return '<span class="api-pill">Checking live API</span>';
     }
-    function slug(value) {
-      return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    function emptyRow(columns, text) {
+      return '<tr><td colspan="' + columns + '"><div class="empty">' + escapeHtml(text) + '</div></td></tr>';
     }
-    function badgeClass(status) {
-      if (status === "Approved" || status === "Submitted" || status === "Requested") return "";
-      if (status === "Under review" || status === "Renewal due") return "warn";
-      return "danger";
+    function vendorRows() {
+      if (!state.data.vendors.length) return emptyRow(5, state.apiBaseUrl ? "No live vendors yet." : "Connect a live API to view vendors.");
+      return state.data.vendors.map(function (vendor) {
+        return '<tr><td><strong>' + escapeHtml(vendor.name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.contact_email || "No contact email") + '</span></td><td>' + escapeHtml(vendor.category || "Uncategorized") + '</td><td>' + escapeHtml(vendor.location || "") + '</td><td><strong>' + escapeHtml(vendor.trust_score || 0) + '</strong></td><td><span class="badge">' + escapeHtml(human(vendor.verification_status || "draft")) + '</span></td></tr>';
+      }).join("");
     }
-    function badge(status) {
-      return '<span class="badge ' + badgeClass(status) + '">' + escapeHtml(status) + '</span>';
+    function requestRows() {
+      if (!state.data.buyer_requests.length) return emptyRow(4, state.apiBaseUrl ? "No live buyer requests yet." : "Connect a live API to view requests.");
+      return state.data.buyer_requests.map(function (request) {
+        return '<tr><td><strong>' + escapeHtml(request.subject) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(request.message || "") + '</span></td><td>' + escapeHtml(request.buyer_name) + '</td><td>' + escapeHtml(request.vendor_name) + '</td><td><span class="badge">' + escapeHtml(human(request.status)) + '</span></td></tr>';
+      }).join("");
     }
+    function logRows() {
+      if (!state.data.request_logs.length) return emptyRow(4, state.apiBaseUrl ? "No live request logs yet." : "Connect a live API to view logs.");
+      return state.data.request_logs.slice(0, 25).map(function (log) {
+        return '<tr><td><strong>' + escapeHtml(log.method + " " + log.path) + '</strong></td><td>' + escapeHtml(log.status) + '</td><td>' + escapeHtml(log.request_id) + '</td><td>' + escapeHtml(log.created_at) + '</td></tr>';
+      }).join("");
+    }
+    function auditRows() {
+      if (!state.data.audit_events.length) return emptyRow(4, state.apiBaseUrl ? "No live audit events yet." : "Connect a live API to view audit events.");
+      return state.data.audit_events.slice(0, 25).map(function (event) {
+        return '<tr><td><strong>' + escapeHtml(human(event.action)) + '</strong></td><td>' + escapeHtml(event.entity_type) + '</td><td>' + escapeHtml(event.request_id || "") + '</td><td>' + escapeHtml(event.summary) + '</td></tr>';
+      }).join("");
+    }
+    function shellIntro() {
+      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page no longer ships fake vendor records. Connect it to the deployed TRUSTPASS Worker API to read and write live D1-backed data.</p>' + statusBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
+    }
+    function statusPage() {
+      return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section></main>';
+    }
+    function vendorsPage() {
+      return '<main><div class="eyebrow">Live records</div><h1>Vendors</h1><p>Rows below come from the connected live API only.</p><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Vendor Trust Profiles</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Location</th><th>Trust</th><th>Status</th></tr></thead><tbody>' + vendorRows() + '</tbody></table></div></div><form id="vendor-form" class="panel pad"><h2>Create Vendor</h2><p>Create a real record in the connected live API.</p><div class="form-grid"><label>Name<input name="name" required /></label><label>Category<input name="category" /></label><label>Location<input name="location" /></label><label>Email<input name="contact_email" type="email" /></label><div class="span-2 actions"><button class="button" ' + (state.apiBaseUrl ? "" : "disabled") + '>Create live vendor</button></div></div></form></section></main>';
+    }
+    function requestsPage() {
+      return '<main><div class="eyebrow">Buyer workflows</div><h1>Requests</h1><section class="panel"><div class="panel-head"><h2>Buyer Requests</h2></div><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Buyer</th><th>Vendor</th><th>Status</th></tr></thead><tbody>' + requestRows() + '</tbody></table></div></section></main>';
+    }
+    function logsPage() {
+      return '<main><div class="eyebrow">Operational proof</div><h1>Logs</h1><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Request Logs</h2></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Status</th><th>ID</th><th>Time</th></tr></thead><tbody>' + logRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Audit Events</h2></div><div class="table-wrap"><table><thead><tr><th>Action</th><th>Entity</th><th>Request ID</th><th>Summary</th></tr></thead><tbody>' + auditRows() + '</tbody></table></div></div></section></main>';
+    }
+    function connectPage() {
+      return '<main><div class="eyebrow">Configuration</div><h1>Connect Live API</h1><section class="panel pad" style="max-width: 780px"><p>Paste the deployed TRUSTPASS Worker URL. This page will call /api/health, /api/readiness, and /api/trustpass from that host.</p><form id="api-form" class="form-grid"><label class="span-2">Live API base URL<input name="api_base_url" required value="' + escapeHtml(state.apiDraft || "") + '" placeholder="https://your-live-trustpass-worker.example" /></label><div class="span-2 actions"><button class="button">Save and test</button><button class="button secondary" type="button" data-action="clear-api">Clear</button></div></form></section></main>';
+    }
+    const pages = {
+      "/": statusPage,
+      "/vendors": vendorsPage,
+      "/requests": requestsPage,
+      "/logs": logsPage,
+      "/connect": connectPage
+    };
     function currentRoute() {
       const raw = location.hash.replace("#", "") || "/";
       const parts = raw.split("?");
       return { path: parts[0] || "/", params: new URLSearchParams(parts[1] || "") };
     }
-    function filteredVendors() {
-      const term = state.search.trim().toLowerCase();
-      return vendors.filter(function (vendor) {
-        const matchesCategory = state.category === "All" || vendor.category === state.category;
-        const haystack = [vendor.name, vendor.category, vendor.location, vendor.level, vendor.badges].join(" ").toLowerCase();
-        return matchesCategory && (!term || haystack.includes(term));
-      });
-    }
-    function vendorRows(list) {
-      if (!list.length) {
-        return '<tr><td colspan="7"><div class="empty">No vendors match the current filters.</div></td></tr>';
-      }
-      return list.map(function (vendor) {
-        const id = slug(vendor.name);
-        const isShortlisted = state.shortlists.includes(vendor.name);
-        const requested = state.requests.includes(vendor.name);
-        return '<tr>' +
-          '<td><strong>' + escapeHtml(vendor.name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.level) + '</span></td>' +
-          '<td>' + escapeHtml(vendor.category) + '</td>' +
-          '<td>' + escapeHtml(vendor.location) + '</td>' +
-          '<td><strong>' + vendor.score + '</strong></td>' +
-          '<td>' + badge(vendor.status) + '</td>' +
-          '<td>' + escapeHtml(vendor.badges) + '</td>' +
-          '<td><button class="button secondary" data-action="shortlist" data-vendor="' + escapeHtml(vendor.name) + '" data-vendor-id="' + escapeHtml(vendor.id) + '">' + (isShortlisted ? "Shortlisted" : "Shortlist") + '</button> ' +
-          '<button class="button ghost" data-action="request" data-vendor="' + escapeHtml(vendor.name) + '" data-vendor-id="' + escapeHtml(vendor.id) + '" id="request-' + id + '">' + (requested ? "Requested" : "Request") + '</button></td>' +
-        '</tr>';
-      }).join("");
-    }
-    function documentRows() {
-      return state.documents.map(function (doc) {
-        return '<tr><td>' + escapeHtml(doc.name) + '</td><td>' + badge(doc.status) + '</td><td>' + escapeHtml(doc.expiry) + '</td></tr>';
-      }).join("");
-    }
-    function queueRows() {
-      return state.queue.map(function (item) {
-        const canApprove = item.status !== "Approved";
-        return '<tr><td><strong>' + escapeHtml(item.vendor) + '</strong></td><td>' + escapeHtml(item.category) + '</td><td>' + escapeHtml(item.submitted) + '</td><td>' + item.documents + '</td><td>' + escapeHtml(item.risk) + '</td><td>' + badge(item.status) + '</td><td><button class="button secondary" data-action="approve" data-vendor="' + escapeHtml(item.vendor) + '" data-review-id="' + escapeHtml(item.id || "") + '"' + (canApprove ? "" : " disabled") + '>' + (canApprove ? "Approve" : "Approved") + '</button></td></tr>';
-      }).join("");
-    }
-    function homePage() {
-      const apiStatus = apiEnabled() ? '<div id="api-status" class="api-pill ' + (state.apiError ? "error" : "connected") + '">' + escapeHtml(state.apiError || state.apiStatus || "API mode ready") + '</div>' : "";
-      return '<main>' +
-        '<section class="hero"><div><div class="eyebrow">Vendor trust operations</div><h1>TRUSTPASS</h1><p>Vendor verification, document review, buyer shortlisting, and procurement-ready trust profiles for B2B teams.</p>' + apiStatus + '<div class="actions"><a class="button" href="#/vendor">Vendor workspace</a><a class="button secondary" href="#/buyer">Buyer search</a></div></div>' +
-        '<div class="panel"><div class="panel-head"><div><h2>Verified vendors</h2><p style="margin: 4px 0 0">Seeded TRUSTPASS demo data</p></div><strong style="font-size: 28px; color: var(--accent)">3</strong></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Trust</th><th>Status</th></tr></thead><tbody>' +
-        vendors.map(function (vendor) { return '<tr><td><strong>' + escapeHtml(vendor.name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.category) + '</span></td><td><strong>' + vendor.score + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.level) + '</span></td><td>' + badge(vendor.status) + '</td></tr>'; }).join("") +
-        '</tbody></table></div></div></section>' +
-        '<section class="panel stats"><div class="stat"><span>Vendors</span><strong>3</strong></div><div class="stat"><span>Shortlisted</span><strong id="home-shortlisted">' + state.shortlists.length + '</strong></div><div class="stat"><span>Requests</span><strong id="home-requests">' + state.requests.length + '</strong></div><div class="stat"><span>Queue</span><strong>' + state.queue.filter(function (item) { return item.status !== "Approved"; }).length + '</strong></div></section>' +
-      '</main>';
-    }
-    function vendorPage() {
-      const expiring = state.documents.filter(function (doc) { return doc.status === "Renewal due"; }).length;
-      return '<main><div class="eyebrow">Atlas Freight Partners</div><h1>Vendor trust workspace</h1><p>Verification is approved. Renewal work can be submitted without leaving the workspace.</p>' +
-        '<section class="panel stats"><div class="stat"><span>Trust score</span><strong>88</strong></div><div class="stat"><span>Checklist</span><strong>' + (state.renewalSubmitted ? "86%" : "74%") + '</strong></div><div class="stat"><span>Documents</span><strong>' + state.documents.length + '</strong></div><div class="stat"><span>Expiring</span><strong>' + expiring + '</strong></div></section>' +
-        '<section class="grid-2"><div class="panel"><div class="panel-head"><h2>Document vault</h2><button class="button secondary" data-action="submit-renewal">Submit renewal</button></div><div class="table-wrap"><table><thead><tr><th>Document</th><th>Status</th><th>Expiry</th></tr></thead><tbody>' + documentRows() + '</tbody></table></div></div>' +
-        '<div class="panel list"><h2>Checklist progress</h2><div class="row"><strong>Business identity</strong><span>Complete</span></div><div class="row"><strong>Tax registration</strong><span>Complete</span></div><div class="row"><strong>Bank proof</strong><span>Complete</span></div><div class="row"><strong>References</strong><span>' + (state.renewalSubmitted ? "Submitted" : "Pending") + '</span></div><div class="row"><strong>Category compliance</strong><span>' + (state.renewalSubmitted ? "In review" : "Pending") + '</span></div>' + (state.renewalSubmitted ? '<div class="notice" id="renewal-notice">Renewal submitted for admin review.</div>' : "") + '</div></section></main>';
-    }
-    function buyerPage() {
-      const list = filteredVendors();
-      return '<main><div class="eyebrow">Buyer workspace</div><h1>Verified vendor search</h1><p>Search is scoped to buyer-safe profile data, active badges, and approved trust summaries.</p>' +
-        '<section class="panel"><div class="filters"><label>Search<input id="vendor-search" value="' + escapeHtml(state.search) + '" placeholder="Vendor, city, category" /></label><label>Category<select id="category-filter"><option>All</option>' + ["Logistics", "Digital services", "Consulting"].map(function (category) { return '<option' + (state.category === category ? " selected" : "") + '>' + category + '</option>'; }).join("") + '</select></label><button class="button secondary" data-action="clear-filters">Clear</button></div>' +
-        '<div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Location</th><th>Trust</th><th>Status</th><th>Badges</th><th>Actions</th></tr></thead><tbody>' + vendorRows(list) + '</tbody></table></div></section>' +
-        '<section class="grid-2"><div class="panel pad"><h2>Shortlist</h2>' + (state.shortlists.length ? '<p id="shortlist-summary">' + state.shortlists.map(escapeHtml).join(", ") + '</p>' : '<p id="shortlist-summary">No vendors shortlisted yet.</p>') + '</div>' +
-        '<div class="panel pad"><h2>Requests</h2>' + (state.requests.length ? '<p id="request-summary">' + state.requests.map(escapeHtml).join(", ") + '</p>' : '<p id="request-summary">No vendor requests yet.</p>') + '</div></section></main>';
-    }
-    function adminPage() {
-      const pending = state.queue.filter(function (item) { return item.status !== "Approved"; }).length;
-      const approved = state.queue.filter(function (item) { return item.status === "Approved"; }).length;
-      return '<main><div class="eyebrow">Admin console</div><h1>Verification review queue</h1><p>Review documents, resolve weighted checks, and issue badge decisions from one queue.</p><section class="panel stats"><div class="stat"><span>Pending</span><strong>' + pending + '</strong></div><div class="stat"><span>Approved</span><strong>' + approved + '</strong></div><div class="stat"><span>Changes</span><strong>' + state.queue.filter(function (item) { return item.status === "Changes requested"; }).length + '</strong></div><div class="stat"><span>Requests</span><strong>' + state.requests.length + '</strong></div></section><section class="panel" style="margin-top: 24px"><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Submitted</th><th>Documents</th><th>Risk</th><th>Status</th><th>Decision</th></tr></thead><tbody>' + queueRows() + '</tbody></table></div></section></main>';
-    }
-    function pricingPage() {
-      return '<main><h1>Pricing</h1><section class="grid-3" style="margin-top: 20px"><div class="panel pad"><h2>Vendor Basic</h2><p>Procurement-ready profile and document vault</p><a class="button secondary" href="#/contact?plan=Vendor%20Basic">Select plan</a></div><div class="panel pad"><h2>Vendor Growth</h2><p>Verification workflow, trust badge, and renewal reminders</p><a class="button secondary" href="#/contact?plan=Vendor%20Growth">Select plan</a></div><div class="panel pad"><h2>Buyer Team</h2><p>Vendor search, shortlists, and request tracking</p><a class="button secondary" href="#/contact?plan=Buyer%20Team">Select plan</a></div></section></main>';
-    }
-    function contactPage(params) {
-      const plan = params.get("plan") || "TRUSTPASS demo";
-      return '<main><h1>Request a demo</h1><section class="panel pad" style="max-width: 760px"><p>Tell us about your vendor verification or procurement workflow and the TRUSTPASS team will follow up.</p><form id="demo-form" class="form-grid"><label>Name<input name="name" required value="Priya Shah" /></label><label>Email<input name="email" type="email" required value="priya@example.com" /></label><label>Organization<input name="organization" required value="Acme Procurement" /></label><label>Plan<input name="plan" value="' + escapeHtml(plan) + '" /></label><label class="span-2">Message<textarea name="message">We want to verify vendors and manage renewal documents.</textarea></label><div class="span-2 actions"><button class="button" type="submit">Send request</button><a class="button secondary" href="mailto:demo@trustpass.local">Email instead</a></div></form>' + (state.contactSuccess ? '<div class="notice" id="contact-success">' + escapeHtml(state.contactSuccess) + '</div>' : "") + '</section></main>';
-    }
-    const pages = {
-      "/": homePage,
-      "/vendor": vendorPage,
-      "/buyer": buyerPage,
-      "/admin": adminPage,
-      "/pricing": pricingPage,
-      "/contact": function (params) { return contactPage(params); }
-    };
     function render() {
       const route = currentRoute();
       const path = pages[route.path] ? route.path : "/";
@@ -450,124 +352,43 @@ const html = `<!doctype html>
         link.classList.toggle("active", link.getAttribute("href") === "#" + path);
       });
     }
-    document.addEventListener("input", function (event) {
-      if (event.target.id === "vendor-search") {
-        state.search = event.target.value;
-        saveState();
-        render();
-        const input = document.getElementById("vendor-search");
-        if (input) {
-          input.focus();
-          input.setSelectionRange(input.value.length, input.value.length);
-        }
-      }
-    });
-    document.addEventListener("change", function (event) {
-      if (event.target.id === "category-filter") {
-        state.category = event.target.value;
-        saveState();
-        render();
-      }
-    });
     document.addEventListener("click", async function (event) {
       const button = event.target.closest("[data-action]");
       if (!button) return;
       const action = button.getAttribute("data-action");
-      const vendor = button.getAttribute("data-vendor");
-      const vendorId = button.getAttribute("data-vendor-id") || (vendorByName(vendor || "") || {}).id;
-      const reviewId = button.getAttribute("data-review-id");
-      const shouldDisableDuringAction = action !== "reset-demo";
-      if (shouldDisableDuringAction) button.disabled = true;
-      try {
-        if (action === "reset-demo") {
-          if (apiEnabled()) {
-            applyApiState(await apiRequest("/demo/reset", { method: "POST" }));
-            saveState();
-            render();
-          } else {
-            resetState();
-          }
-          return;
-        }
-        if (action === "shortlist" && vendor && !state.shortlists.includes(vendor)) {
-          if (apiEnabled()) {
-            await apiRequest("/demo/buyers/shortlists", { method: "POST", body: JSON.stringify({ vendor_id: vendorId, notes: "Shortlisted from TRUSTPASS demo" }) });
-          }
-          state.shortlists.push(vendor);
-        }
-        if (action === "request" && vendor && !state.requests.includes(vendor)) {
-          if (apiEnabled()) {
-            await apiRequest("/demo/buyers/requests", { method: "POST", body: JSON.stringify({ vendor_id: vendorId, subject: "Need buyer-safe trust summary", message: "Please share current verification and renewal summary." }) });
-          }
-          state.requests.push(vendor);
-        }
-        if (action === "submit-renewal" && !state.renewalSubmitted) {
-          if (apiEnabled()) {
-            const renewal = await apiRequest("/demo/vendor/renewal", { method: "POST" });
-            state.documents = renewal.documents.map(function (doc) {
-              return { name: doc.name, status: humanStatus(doc.status), expiry: doc.expiry };
-            });
-            state.renewalSubmitted = renewal.renewal_submitted;
-          } else {
-            state.renewalSubmitted = true;
-            state.documents = state.documents.map(function (doc) {
-              return doc.name === "Insurance certificate" ? Object.assign({}, doc, { status: "Submitted", expiry: "2027-08-15" }) : doc;
-            });
-          }
-        }
-        if (action === "approve" && vendor) {
-          if (apiEnabled() && reviewId) {
-            await apiRequest("/demo/admin/reviews/" + reviewId + "/approve", { method: "PATCH" });
-          }
-          state.queue = state.queue.map(function (item) {
-            return item.vendor === vendor ? Object.assign({}, item, { status: "Approved", risk: "Low" }) : item;
-          });
-        }
-        if (action === "clear-filters") {
-          state.search = "";
-          state.category = "All";
-        }
-        if (apiEnabled()) {
-          state.apiStatus = "API connected";
-          state.apiError = "";
-        }
-        saveState();
+      if (action === "refresh") {
+        await refreshLiveData();
+      }
+      if (action === "clear-api") {
+        localStorage.removeItem(storageKey);
+        state.apiBaseUrl = "";
+        state.apiDraft = "";
+        state.health = null;
+        state.readiness = null;
+        state.error = "";
         render();
-      } catch (error) {
-        state.apiStatus = "API action failed";
-        state.apiError = error.message;
-        saveState();
-        render();
-      } finally {
-        if (!shouldDisableDuringAction && document.contains(button)) {
-          button.disabled = false;
-        }
       }
     });
     document.addEventListener("submit", async function (event) {
-      if (event.target.id !== "demo-form") return;
-      event.preventDefault();
-      const data = Object.fromEntries(new FormData(event.target).entries());
-      try {
-        if (apiEnabled()) {
-          const request = await apiRequest("/demo/contact/demo-requests", { method: "POST", body: JSON.stringify(data) });
-          state.demoRequests.push(request);
-        } else {
-          state.demoRequests.push(data);
-        }
-        state.contactSuccess = "Demo request received for " + data.organization + ".";
-        state.apiError = "";
-      } catch (error) {
-        state.apiStatus = "API action failed";
-        state.apiError = error.message;
+      if (event.target.id === "api-form") {
+        event.preventDefault();
+        const form = new FormData(event.target);
+        state.apiBaseUrl = String(form.get("api_base_url") || "").replace(/\\/$/, "");
+        state.apiDraft = state.apiBaseUrl;
+        localStorage.setItem(storageKey, state.apiBaseUrl);
+        await refreshLiveData();
+        location.hash = "#/";
       }
-      saveState();
-      render();
+      if (event.target.id === "vendor-form") {
+        event.preventDefault();
+        const form = Object.fromEntries(new FormData(event.target).entries());
+        await postTrustpass("create_vendor", form);
+        event.target.reset();
+      }
     });
-    window.TRUSTPASS_DEMO_RESET = resetState;
     addEventListener("hashchange", render);
     render();
-    refreshFromApi();
+    refreshLiveData();
   </script>
 </body>
 </html>`;
@@ -575,4 +396,4 @@ const html = `<!doctype html>
 writeFileSync(path.join(pagesRoot, "index.html"), html);
 writeFileSync(path.join(pagesRoot, "404.html"), html);
 writeFileSync(path.join(pagesRoot, ".nojekyll"), "");
-console.log(`GitHub Pages build written to ${pagesRoot}`);
+console.log("GitHub Pages build written to " + pagesRoot);
