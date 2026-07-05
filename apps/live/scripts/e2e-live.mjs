@@ -220,8 +220,9 @@ state = await postAction(
   },
   `${runId}-buyer`,
 );
-assert(findByName(state.buyers, buyerName), "created buyer not found in state");
-summary.entities.buyer = { name: buyerName };
+const buyer = findByName(state.buyers, buyerName);
+assert(buyer, "created buyer not found in state");
+summary.entities.buyer = { id: buyer.id, name: buyerName };
 summary.checks.push("create_buyer");
 
 state = await postAction(
@@ -241,15 +242,18 @@ summary.checks.push("add_document");
 state = await postAction(
   "create_buyer_request",
   {
-    buyer_name: buyerName,
+    buyer_id: buyer.id,
     vendor_id: vendor.id,
     subject: requestSubject,
     message: "Please review current buyer-safe verification evidence.",
   },
   `${runId}-request`,
 );
-assert(state.buyer_requests.some((requestRow) => requestRow.subject === requestSubject), "buyer request not found in state");
-summary.entities.buyerRequest = { subject: requestSubject };
+const buyerRequest = state.buyer_requests.find((requestRow) => requestRow.subject === requestSubject);
+assert(buyerRequest, "buyer request not found in state");
+assert(buyerRequest.buyer_id === buyer.id, "buyer request is not linked to created buyer organization");
+assert(buyerRequest.buyer_name === buyerName, "buyer request did not expose buyer organization name");
+summary.entities.buyerRequest = { buyerId: buyer.id, subject: requestSubject };
 summary.checks.push("create_buyer_request");
 
 state = await postAction(

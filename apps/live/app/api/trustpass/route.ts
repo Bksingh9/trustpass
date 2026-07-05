@@ -43,6 +43,7 @@ type DocumentRow = {
 
 type BuyerRequestRow = {
   id: string;
+  buyer_id: string;
   buyer_name: string;
   vendor_id: string;
   vendor_name: string;
@@ -98,7 +99,7 @@ async function ensureSchema(db: TrustpassD1Database) {
       "CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, document_name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'submitted', expiry_date TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
     ),
     db.prepare(
-      "CREATE TABLE IF NOT EXISTS buyer_requests (id TEXT PRIMARY KEY, buyer_name TEXT NOT NULL, vendor_id TEXT NOT NULL, subject TEXT NOT NULL, message TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+      "CREATE TABLE IF NOT EXISTS buyer_requests (id TEXT PRIMARY KEY, buyer_id TEXT NOT NULL DEFAULT '', buyer_name TEXT NOT NULL, vendor_id TEXT NOT NULL, subject TEXT NOT NULL, message TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
     ),
     db.prepare(
       "CREATE TABLE IF NOT EXISTS verification_decisions (id TEXT PRIMARY KEY, vendor_id TEXT NOT NULL, status TEXT NOT NULL, trust_score INTEGER NOT NULL DEFAULT 0, notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
@@ -119,6 +120,13 @@ async function ensureSchema(db: TrustpassD1Database) {
     .prepare("ALTER TABLE audit_events ADD COLUMN request_id TEXT NOT NULL DEFAULT ''")
     .run()
     .catch(() => undefined);
+  await db
+    .prepare("ALTER TABLE buyer_requests ADD COLUMN buyer_id TEXT NOT NULL DEFAULT ''")
+    .run()
+    .catch(() => undefined);
+  await db
+    .prepare("CREATE INDEX IF NOT EXISTS idx_requests_buyer_created ON buyer_requests (buyer_id, created_at)")
+    .run();
 }
 
 async function recordAudit(
@@ -182,7 +190,7 @@ async function readState(db: TrustpassD1Database) {
     .all<DocumentRow>();
   const buyerRequests = await db
     .prepare(
-      "SELECT buyer_requests.*, organizations.name AS vendor_name FROM buyer_requests JOIN organizations ON organizations.id = buyer_requests.vendor_id ORDER BY buyer_requests.created_at DESC LIMIT 50",
+      "SELECT buyer_requests.id, buyer_requests.buyer_id, COALESCE(NULLIF(buyer_org.name, ''), buyer_requests.buyer_name) AS buyer_name, buyer_requests.vendor_id, vendor_org.name AS vendor_name, buyer_requests.subject, buyer_requests.message, buyer_requests.status, buyer_requests.created_at FROM buyer_requests JOIN organizations AS vendor_org ON vendor_org.id = buyer_requests.vendor_id LEFT JOIN organizations AS buyer_org ON buyer_org.id = buyer_requests.buyer_id ORDER BY buyer_requests.created_at DESC LIMIT 50",
     )
     .all<BuyerRequestRow>();
   const decisions = await db
@@ -279,12 +287,20 @@ export async function POST(request: Request) {
         .run();
       await recordAudit(db, requestId, "upload", "document", id, `Added ${documentName} for ${vendor.name}`);
     } else if (action === "create_buyer_request") {
-      const buyerName = String(payload.buyer_name ?? "").trim();
+      const buyerId = String(payload.buyer_id ?? "").trim();
+      const fallbackBuyerName = String(payload.buyer_name ?? "").trim();
       const vendorId = String(payload.vendor_id ?? "");
       const subject = String(payload.subject ?? "").trim();
-      if (!buyerName || !vendorId || !subject) {
-        return fail("Buyer name, vendor, and subject are required");
+      if ((!buyerId && !fallbackBuyerName) || !vendorId || !subject) {
+        return fail("Buyer, vendor, and subject are required");
       }
+      const buyer = buyerId
+        ? await db
+            .prepare("SELECT id, name FROM organizations WHERE id = ? AND type = 'buyer'")
+            .bind(buyerId)
+            .first<{ id: string; name: string }>()
+        : null;
+      if (buyerId && !buyer) return fail("Buyer not found");
       const vendor = await db
         .prepare("SELECT id, name FROM organizations WHERE id = ? AND type = 'vendor'")
         .bind(vendorId)
@@ -293,11 +309,18 @@ export async function POST(request: Request) {
       const id = crypto.randomUUID();
       await db
         .prepare(
-          "INSERT INTO buyer_requests (id, buyer_name, vendor_id, subject, message) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO buyer_requests (id, buyer_id, buyer_name, vendor_id, subject, message) VALUES (?, ?, ?, ?, ?, ?)",
         )
-        .bind(id, buyerName, vendorId, subject, String(payload.message ?? "").trim())
+        .bind(id, buyer?.id ?? "", buyer?.name ?? fallbackBuyerName, vendorId, subject, String(payload.message ?? "").trim())
         .run();
-      await recordAudit(db, requestId, "request_info", "buyer_request", id, `${buyerName} requested info from ${vendor.name}`);
+      await recordAudit(
+        db,
+        requestId,
+        "request_info",
+        "buyer_request",
+        id,
+        `${buyer?.name ?? fallbackBuyerName} requested info from ${vendor.name}`,
+      );
     } else if (action === "decide_verification") {
       const vendorId = String(payload.vendor_id ?? "");
       const decision = String(payload.status ?? "").trim();

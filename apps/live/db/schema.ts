@@ -36,6 +36,7 @@ export const buyerRequests = sqliteTable(
   "buyer_requests",
   {
     id: text("id").primaryKey(),
+    buyerId: text("buyer_id").notNull().default(""),
     buyerName: text("buyer_name").notNull(),
     vendorId: text("vendor_id").notNull(),
     subject: text("subject").notNull(),
@@ -43,7 +44,10 @@ export const buyerRequests = sqliteTable(
     status: text("status").notNull().default("open"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [index("idx_requests_vendor_created").on(table.vendorId, table.createdAt)],
+  (table) => [
+    index("idx_requests_vendor_created").on(table.vendorId, table.createdAt),
+    index("idx_requests_buyer_created").on(table.buyerId, table.createdAt),
+  ],
 );
 
 export const verificationDecisions = sqliteTable("verification_decisions", {

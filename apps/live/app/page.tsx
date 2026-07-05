@@ -33,6 +33,7 @@ type DocumentRecord = {
 
 type BuyerRequest = {
   id: string;
+  buyer_id: string;
   buyer_name: string;
   vendor_name: string;
   subject: string;
@@ -184,6 +185,7 @@ export default function Home() {
   );
 
   const primaryVendorId = state.vendors[0]?.id ?? "";
+  const primaryBuyerId = state.buyers[0]?.id ?? "";
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] text-[#142033]">
@@ -238,7 +240,7 @@ export default function Home() {
           <form onSubmit={onSubmit("add_document")} className="rounded-md border border-[#d9e0ea] bg-white p-5">
             <h2 className="text-lg font-bold">Add Document Metadata</h2>
             <div className="mt-4 grid gap-3">
-              <select name="vendor_id" required defaultValue={primaryVendorId}>
+              <select key={primaryVendorId || "no-document-vendor"} name="vendor_id" required defaultValue={primaryVendorId}>
                 <option value="">Select vendor</option>
                 {state.vendors.map((vendor) => (
                   <option key={vendor.id} value={vendor.id}>
@@ -261,8 +263,15 @@ export default function Home() {
           <form onSubmit={onSubmit("create_buyer_request")} className="rounded-md border border-[#d9e0ea] bg-white p-5">
             <h2 className="text-lg font-bold">Create Buyer Request</h2>
             <div className="mt-4 grid gap-3">
-              <input name="buyer_name" required placeholder="Buyer contact or team" />
-              <select name="vendor_id" required defaultValue={primaryVendorId}>
+              <select key={primaryBuyerId || "no-buyer"} name="buyer_id" required defaultValue={primaryBuyerId}>
+                <option value="">Select buyer</option>
+                {state.buyers.map((buyer) => (
+                  <option key={buyer.id} value={buyer.id}>
+                    {buyer.name}
+                  </option>
+                ))}
+              </select>
+              <select key={primaryVendorId || "no-vendor"} name="vendor_id" required defaultValue={primaryVendorId}>
                 <option value="">Select vendor</option>
                 {state.vendors.map((vendor) => (
                   <option key={vendor.id} value={vendor.id}>
@@ -279,7 +288,7 @@ export default function Home() {
           <form onSubmit={onSubmit("decide_verification")} className="rounded-md border border-[#d9e0ea] bg-white p-5">
             <h2 className="text-lg font-bold">Record Verification Decision</h2>
             <div className="mt-4 grid gap-3">
-              <select name="vendor_id" required defaultValue={primaryVendorId}>
+              <select key={primaryVendorId || "no-decision-vendor"} name="vendor_id" required defaultValue={primaryVendorId}>
                 <option value="">Select vendor</option>
                 {state.vendors.map((vendor) => (
                   <option key={vendor.id} value={vendor.id}>
