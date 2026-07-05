@@ -32,6 +32,14 @@ from app.models.verification import TrustScoreSnapshot, VerificationRequest
 router = APIRouter()
 
 
+def _response_headers(request_id: str) -> dict[str, str]:
+    return {
+        "x-request-id": request_id,
+        "Cache-Control": "no-store, max-age=0",
+        "Pragma": "no-cache",
+    }
+
+
 def _request_id(request: Request) -> str:
     return request.headers.get("x-request-id") or f"live-gateway-{datetime.now(timezone.utc).timestamp()}"
 
@@ -283,7 +291,7 @@ def _state_response(db: Session, request_id: str, status_code: int = 200) -> JSO
     return JSONResponse(
         {"data": _live_state(db, request_id), "request_id": request_id},
         status_code=status_code,
-        headers={"x-request-id": request_id},
+        headers=_response_headers(request_id),
     )
 
 
@@ -298,7 +306,7 @@ async def gateway_health(request: Request) -> JSONResponse:
             "demo_data_enabled": False,
             "request_id": request_id,
         },
-        headers={"x-request-id": request_id},
+        headers=_response_headers(request_id),
     )
 
 
@@ -315,7 +323,7 @@ async def gateway_readiness(request: Request, db: Session = Depends(get_db)) -> 
             "missing_tables": [],
             "request_id": request_id,
         },
-        headers={"x-request-id": request_id},
+        headers=_response_headers(request_id),
     )
 
 
@@ -341,7 +349,7 @@ async def operational_proof(request: Request, db: Session = Depends(get_db)) -> 
             },
             "request_id": request_id,
         },
-        headers={"x-request-id": request_id},
+        headers=_response_headers(request_id),
     )
 
 
