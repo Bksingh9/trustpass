@@ -15,6 +15,13 @@
       "when": 1783244432174,
       "tag": "0001_ambiguous_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783256846500,
+      "tag": "0002_bent_shotgun",
+      "breakpoints": true
     }
   ]
 }
