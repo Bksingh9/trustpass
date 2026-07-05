@@ -16,6 +16,7 @@ const notFoundHtml = readFileSync(notFoundPath, "utf8");
 
 const requiredSnippets = [
   "<title>TRUSTPASS</title>",
+  'name="trustpass-build-sha"',
   "TRUSTPASS Live Gateway",
   "Connect Live API",
   "trustpass-live-api-base-url",

@@ -6,6 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, "..");
 const pagesRoot = path.join(webRoot, "pages");
 const liveApiBaseUrl = (process.env.TRUSTPASS_LIVE_BASE_URL || "").trim().replace(/\/$/, "");
+const buildSha = (process.env.GITHUB_SHA || "local-build").trim();
 
 rmSync(pagesRoot, { recursive: true, force: true });
 mkdirSync(pagesRoot, { recursive: true });
@@ -15,6 +16,7 @@ const html = `<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="trustpass-build-sha" content="${buildSha}" />
   <title>TRUSTPASS</title>
   <style>
     :root {

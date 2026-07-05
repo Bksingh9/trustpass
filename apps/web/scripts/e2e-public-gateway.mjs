@@ -18,6 +18,7 @@ const forbiddenSnippets = [
 
 const requiredSnippets = [
   "TRUSTPASS Live Gateway",
+  'name="trustpass-build-sha"',
   "Connect Live API",
   "trustpass-live-api-base-url",
   "buildConfiguredApiBaseUrl",
