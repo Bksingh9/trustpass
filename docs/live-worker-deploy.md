@@ -14,6 +14,10 @@ Add these repository secrets:
 The token must be allowed to deploy Workers and apply D1 migrations for the
 target account.
 
+Before attempting deployment, the workflow verifies the Cloudflare API token and
+checks D1 account access so missing or under-scoped secrets fail before database
+creation, migrations, or Worker upload.
+
 The workflow can use an existing Cloudflare D1 database ID, or it can resolve an
 existing database by name and create it when it does not exist.
 

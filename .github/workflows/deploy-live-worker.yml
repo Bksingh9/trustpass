@@ -64,12 +64,8 @@ jobs:
           cache: npm
           cache-dependency-path: apps/live/package-lock.json
 
-      - name: Check Cloudflare deployment credentials
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "${CLOUDFLARE_ACCOUNT_ID}"
-          test -n "${CLOUDFLARE_API_TOKEN}"
+      - name: Preflight Cloudflare deployment access
+        run: node scripts/check-cloudflare-deploy-access.mjs
 
       - name: Ensure D1 database
         run: node scripts/ensure-cloudflare-d1.mjs
