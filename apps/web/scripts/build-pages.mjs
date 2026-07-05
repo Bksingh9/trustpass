@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, "..");
 const pagesRoot = path.join(webRoot, "pages");
-const liveApiBaseUrl = (process.env.TRUSTPASS_LIVE_BASE_URL || "").trim().replace(/\/$/, "");
+const liveApiBaseUrl = (
+  process.env.TRUSTPASS_LIVE_BASE_URL ||
+  process.env.TRUSTPASS_API_BASE_URL ||
+  "https://trustpass-api.onrender.com/api/v1"
+)
+  .trim()
+  .replace(/\/$/, "");
 const buildSha = (process.env.GITHUB_SHA || "local-build").trim();
 
 rmSync(pagesRoot, { recursive: true, force: true });
@@ -342,10 +348,10 @@ const html = `<!doctype html>
       }).join("");
     }
     function shellIntro() {
-      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page no longer ships fake vendor records. Connect it to the deployed TRUSTPASS Worker API to read and write live D1-backed data.</p>' + statusBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
+      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page no longer ships fake vendor records. It reads and writes live Render/FastAPI/Postgres records through the deployed TRUSTPASS API.</p>' + statusBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
     }
     function statusPage() {
-      return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section><section class="panel pad"><h2>Operational Proof</h2><p>Fetched from /api/operational-proof on the connected Worker.</p><pre>' + escapeHtml(JSON.stringify(state.proof || {}, null, 2)) + '</pre></section></main>';
+      return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section><section class="panel pad"><h2>Operational Proof</h2><p>Fetched from /api/operational-proof on the connected Render API.</p><pre>' + escapeHtml(JSON.stringify(state.proof || {}, null, 2)) + '</pre></section></main>';
     }
     function vendorsPage() {
       return '<main><div class="eyebrow">Live records</div><h1>Vendors</h1><p>Rows below come from the connected live API only.</p><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Vendor Trust Profiles</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Location</th><th>Trust</th><th>Status</th></tr></thead><tbody>' + vendorRows() + '</tbody></table></div></div><form id="vendor-form" class="panel pad"><h2>Create Vendor</h2><p>Create a real record in the connected live API.</p><div class="form-grid"><label>Name<input name="name" required /></label><label>Category<input name="category" /></label><label>Location<input name="location" /></label><label>Email<input name="contact_email" type="email" /></label><div class="span-2 actions"><button class="button" ' + (state.apiBaseUrl ? "" : "disabled") + '>Create live vendor</button></div></div></form></section></main>';
@@ -360,7 +366,7 @@ const html = `<!doctype html>
       return '<main><div class="eyebrow">Operational proof</div><h1>Logs</h1><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Request Logs</h2></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Status</th><th>ID</th><th>Time</th></tr></thead><tbody>' + logRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Audit Events</h2></div><div class="table-wrap"><table><thead><tr><th>Action</th><th>Entity</th><th>Request ID</th><th>Summary</th></tr></thead><tbody>' + auditRows() + '</tbody></table></div></div></section><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Trust Score History</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Score</th><th>Status</th><th>Summary</th></tr></thead><tbody>' + scoreRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Notifications</h2></div><div class="table-wrap"><table><thead><tr><th>Title</th><th>Organization</th><th>Request ID</th><th>Body</th></tr></thead><tbody>' + notificationRows() + '</tbody></table></div></div></section></main>';
     }
     function connectPage() {
-      return '<main><div class="eyebrow">Configuration</div><h1>Connect Live API</h1><section class="panel pad" style="max-width: 780px"><p>Paste the deployed TRUSTPASS Worker URL. This page will call /api/health, /api/readiness, /api/trustpass, and /api/operational-proof from that host.</p><form id="api-form" class="form-grid"><label class="span-2">Live API base URL<input name="api_base_url" required value="' + escapeHtml(state.apiDraft || "") + '" placeholder="https://your-live-trustpass-worker.example" /></label><div class="span-2 actions"><button class="button">Save and test</button><button class="button secondary" type="button" data-action="clear-api">Clear</button></div></form></section></main>';
+      return '<main><div class="eyebrow">Configuration</div><h1>Connect Live API</h1><section class="panel pad" style="max-width: 780px"><p>Paste the deployed TRUSTPASS API base URL. This page will call /api/health, /api/readiness, /api/trustpass, and /api/operational-proof from that host.</p><form id="api-form" class="form-grid"><label class="span-2">Live API base URL<input name="api_base_url" required value="' + escapeHtml(state.apiDraft || "") + '" placeholder="https://trustpass-api.onrender.com/api/v1" /></label><div class="span-2 actions"><button class="button">Save and test</button><button class="button secondary" type="button" data-action="clear-api">Clear</button></div></form></section></main>';
     }
     const pages = {
       "/": statusPage,

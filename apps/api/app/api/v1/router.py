@@ -12,6 +12,7 @@ from app.api.v1.routes import (
     demo,
     documents,
     health,
+    live_gateway,
     metrics,
     notifications,
     orgs,
@@ -32,6 +33,7 @@ api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
 api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
+api_router.include_router(live_gateway.router, prefix="/api", tags=["live-gateway"])
 
 if get_settings().enable_demo_routes:
     api_router.include_router(demo.router, prefix="/demo", tags=["demo"])
