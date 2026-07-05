@@ -63,3 +63,12 @@
 6. Approve a review through `/api/v1/demo/admin/reviews/{review_id}/approve`.
 7. Submit a contact request through `/api/v1/demo/contact/demo-requests`.
 8. Confirm audit-style events are present in `/api/v1/demo/state`.
+
+## API-Backed Browser Demo
+
+1. Start FastAPI on `http://127.0.0.1:8000`.
+2. Build and serve Pages locally on `http://127.0.0.1:4174`.
+3. Open `/?api=http%3A%2F%2F127.0.0.1%3A8000%2Fapi%2Fv1#/`.
+4. Confirm the home screen shows `API connected`.
+5. Use the UI to submit renewal, shortlist, request, approve, and submit a demo request.
+6. Confirm `/api/v1/demo/state` reflects `submitted`, one shortlist, one buyer request, one demo request, approved review, and audit events.

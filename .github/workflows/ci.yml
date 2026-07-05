@@ -49,3 +49,52 @@ jobs:
 
       - name: Run static Pages E2E
         run: node apps/web/scripts/e2e-static.mjs
+
+  full-stack-demo:
+    name: API-backed web smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: python -m pip install -e ".[dev]"
+
+      - name: Build static Pages app
+        run: node apps/web/scripts/build-pages.mjs
+
+      - name: Start local stack and run API-backed smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --app-dir apps/api &
+          api_pid=$!
+          PORT=4174 node apps/web/scripts/serve-pages.mjs &
+          web_pid=$!
+
+          cleanup() {
+            kill "$api_pid" "$web_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/api/v1/demo/health >/dev/null && curl -fsS http://127.0.0.1:4174/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -fsS http://127.0.0.1:8000/api/v1/demo/health >/dev/null
+          curl -fsS http://127.0.0.1:4174/ >/dev/null
+          API_BASE_URL=http://127.0.0.1:8000/api/v1 WEB_BASE_URL=http://127.0.0.1:4174 node apps/web/scripts/e2e-api-backed.mjs

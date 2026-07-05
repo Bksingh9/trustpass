@@ -14,7 +14,16 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     database_url: str = "postgresql+psycopg://trustpass:trustpass@localhost:5432/trustpass"
     redis_url: str = "redis://localhost:6379/0"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:4174",
+            "http://127.0.0.1:4174",
+            "https://bksingh9.github.io",
+        ]
+    )
 
     supabase_project_url: str | None = None
     supabase_jwt_audience: str = "authenticated"
@@ -35,4 +44,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

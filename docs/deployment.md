@@ -69,12 +69,47 @@ The public demo is served by GitHub Pages from the `gh-pages` branch:
 
 GitHub Pages is static hosting, so it does not run the FastAPI backend. The repository keeps the backend end-to-end proof under `/api/v1/demo/*` for local, container, and CI verification until a real API host is attached.
 
+## Local API-Backed Web Demo
+
+Start the API:
+
+```bash
+cd apps/api
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Build and serve the static app:
+
+```bash
+cd apps/web
+npm run build:pages
+PORT=4174 npm run serve:pages
+```
+
+Open the static app with an API base URL:
+
+```text
+http://127.0.0.1:4174/?api=http%3A%2F%2F127.0.0.1%3A8000%2Fapi%2Fv1#/
+```
+
+In API-backed mode, browser actions call FastAPI demo endpoints for reset, vendor renewal, buyer shortlist, buyer request, admin approval, and contact/demo request. Without the `api` query parameter, the same static app remains a standalone public demo.
+
+The API default CORS allowlist includes:
+
+- `http://localhost:3000`
+- `http://localhost:4173`
+- `http://127.0.0.1:4173`
+- `http://localhost:4174`
+- `http://127.0.0.1:4174`
+- `https://bksingh9.github.io`
+
 ## End-to-End Verification
 
 GitHub Actions runs `.github/workflows/ci.yml` on pushes and pull requests:
 
 - API tests install `apps/api` and run `pytest`, including `tests/test_demo_e2e.py`.
 - Static Pages smoke runs `node apps/web/scripts/e2e-static.mjs`.
+- API-backed web smoke starts FastAPI, serves the generated Pages app locally, and runs `node apps/web/scripts/e2e-api-backed.mjs`.
 
 The API demo route verifies the product loop:
 

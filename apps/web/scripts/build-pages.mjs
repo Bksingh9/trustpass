@@ -174,6 +174,21 @@ const html = `<!doctype html>
       font-weight: 700;
       margin-top: 14px;
     }
+    .api-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      margin-top: 14px;
+      padding: 5px 9px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: white;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .api-pill.connected { border-color: #b7e4d5; color: #075a46; background: #eefbf6; }
+    .api-pill.error { border-color: #ffd5cc; color: var(--danger); background: #fff0ed; }
     .empty { color: var(--muted); padding: 14px 0; }
     @media (max-width: 900px) {
       header { padding: 12px 16px; align-items: flex-start; flex-direction: column; }
@@ -207,22 +222,29 @@ const html = `<!doctype html>
       requests: [],
       renewalSubmitted: false,
       contactSuccess: "",
+      apiStatus: "",
+      apiError: "",
       documents: [
         { name: "Business registration", status: "Approved", expiry: "2027-03-30" },
         { name: "GST certificate", status: "Approved", expiry: "2027-03-30" },
         { name: "Insurance certificate", status: "Renewal due", expiry: "2026-08-15" }
       ],
       queue: [
-        { vendor: "Northstar Digital Studio", category: "Digital services", submitted: "2026-06-27", documents: 7, risk: "Medium", status: "Under review" },
-        { vendor: "Clearpath Advisory", category: "Consulting", submitted: "2026-06-29", documents: 4, risk: "High", status: "Changes requested" }
+        { id: "vr-1007", vendor: "Northstar Digital Studio", category: "Digital services", submitted: "2026-06-27", documents: 7, risk: "Medium", status: "Under review" },
+        { id: "vr-1008", vendor: "Clearpath Advisory", category: "Consulting", submitted: "2026-06-29", documents: 4, risk: "High", status: "Changes requested" }
       ],
       demoRequests: []
     };
     const vendors = [
-      { name: "Atlas Freight Partners", category: "Logistics", location: "Mumbai, IN", score: 88, level: "Trusted", status: "Approved", badges: "Verified, Insurance checked" },
-      { name: "Northstar Digital Studio", category: "Digital services", location: "Bengaluru, IN", score: 73, level: "Verified", status: "Under review", badges: "Identity checked" },
-      { name: "Clearpath Advisory", category: "Consulting", location: "Delhi, IN", score: 42, level: "In review", status: "Changes requested", badges: "None" }
+      { id: "atlas-freight-partners", name: "Atlas Freight Partners", category: "Logistics", location: "Mumbai, IN", score: 88, level: "Trusted", status: "Approved", badges: "Verified, Insurance checked" },
+      { id: "northstar-digital-studio", name: "Northstar Digital Studio", category: "Digital services", location: "Bengaluru, IN", score: 73, level: "Verified", status: "Under review", badges: "Identity checked" },
+      { id: "clearpath-advisory", name: "Clearpath Advisory", category: "Consulting", location: "Delhi, IN", score: 42, level: "In review", status: "Changes requested", badges: "None" }
     ];
+    const runtimeParams = new URLSearchParams(location.search);
+    const configuredApiBaseUrl = (runtimeParams.get("api") || localStorage.getItem("trustpass-api-base-url") || "").replace(/\\/$/, "");
+    if (runtimeParams.get("api")) {
+      localStorage.setItem("trustpass-api-base-url", configuredApiBaseUrl);
+    }
     let state = loadState();
 
     function clone(value) {
@@ -241,6 +263,76 @@ const html = `<!doctype html>
     }
     function resetState() {
       state = clone(defaults);
+      saveState();
+      render();
+    }
+    function apiEnabled() {
+      return Boolean(configuredApiBaseUrl);
+    }
+    async function apiRequest(path, options) {
+      if (!apiEnabled()) return null;
+      const response = await fetch(configuredApiBaseUrl + path, Object.assign({
+        headers: { "content-type": "application/json" }
+      }, options || {}));
+      if (!response.ok) {
+        throw new Error("API " + path + " returned " + response.status);
+      }
+      const body = await response.json();
+      return body.data;
+    }
+    function humanStatus(value) {
+      const labels = {
+        approved: "Approved",
+        changes_requested: "Changes requested",
+        high: "High",
+        low: "Low",
+        medium: "Medium",
+        open: "Open",
+        renewal_due: "Renewal due",
+        submitted: "Submitted",
+        under_review: "Under review"
+      };
+      if (labels[value]) return labels[value];
+      return String(value || "").split("_").filter(Boolean).map(function (part) {
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      }).join(" ");
+    }
+    function vendorByName(name) {
+      return vendors.find(function (vendor) { return vendor.name === name; });
+    }
+    function applyApiState(apiState) {
+      if (!apiState) return;
+      state.documents = (apiState.documents || state.documents).map(function (doc) {
+        return { name: doc.name, status: humanStatus(doc.status), expiry: doc.expiry };
+      });
+      state.queue = (apiState.review_queue || state.queue).map(function (item) {
+        return {
+          id: item.id,
+          vendor: item.vendor_name,
+          category: item.category,
+          submitted: item.submitted_at,
+          documents: item.documents,
+          risk: humanStatus(item.risk),
+          status: humanStatus(item.status)
+        };
+      });
+      state.shortlists = (apiState.shortlists || []).map(function (item) { return item.vendor_name; });
+      state.requests = (apiState.buyer_requests || []).map(function (item) { return item.vendor_name; });
+      state.demoRequests = apiState.demo_requests || state.demoRequests;
+      state.renewalSubmitted = state.documents.some(function (doc) {
+        return doc.name === "Insurance certificate" && doc.status === "Submitted";
+      });
+      state.apiStatus = "API connected";
+      state.apiError = "";
+    }
+    async function refreshFromApi() {
+      if (!apiEnabled()) return;
+      try {
+        applyApiState(await apiRequest("/demo/state"));
+      } catch (error) {
+        state.apiStatus = "API unavailable";
+        state.apiError = error.message;
+      }
       saveState();
       render();
     }
@@ -288,8 +380,8 @@ const html = `<!doctype html>
           '<td><strong>' + vendor.score + '</strong></td>' +
           '<td>' + badge(vendor.status) + '</td>' +
           '<td>' + escapeHtml(vendor.badges) + '</td>' +
-          '<td><button class="button secondary" data-action="shortlist" data-vendor="' + escapeHtml(vendor.name) + '">' + (isShortlisted ? "Shortlisted" : "Shortlist") + '</button> ' +
-          '<button class="button ghost" data-action="request" data-vendor="' + escapeHtml(vendor.name) + '" id="request-' + id + '">' + (requested ? "Requested" : "Request") + '</button></td>' +
+          '<td><button class="button secondary" data-action="shortlist" data-vendor="' + escapeHtml(vendor.name) + '" data-vendor-id="' + escapeHtml(vendor.id) + '">' + (isShortlisted ? "Shortlisted" : "Shortlist") + '</button> ' +
+          '<button class="button ghost" data-action="request" data-vendor="' + escapeHtml(vendor.name) + '" data-vendor-id="' + escapeHtml(vendor.id) + '" id="request-' + id + '">' + (requested ? "Requested" : "Request") + '</button></td>' +
         '</tr>';
       }).join("");
     }
@@ -301,12 +393,13 @@ const html = `<!doctype html>
     function queueRows() {
       return state.queue.map(function (item) {
         const canApprove = item.status !== "Approved";
-        return '<tr><td><strong>' + escapeHtml(item.vendor) + '</strong></td><td>' + escapeHtml(item.category) + '</td><td>' + escapeHtml(item.submitted) + '</td><td>' + item.documents + '</td><td>' + escapeHtml(item.risk) + '</td><td>' + badge(item.status) + '</td><td><button class="button secondary" data-action="approve" data-vendor="' + escapeHtml(item.vendor) + '"' + (canApprove ? "" : " disabled") + '>' + (canApprove ? "Approve" : "Approved") + '</button></td></tr>';
+        return '<tr><td><strong>' + escapeHtml(item.vendor) + '</strong></td><td>' + escapeHtml(item.category) + '</td><td>' + escapeHtml(item.submitted) + '</td><td>' + item.documents + '</td><td>' + escapeHtml(item.risk) + '</td><td>' + badge(item.status) + '</td><td><button class="button secondary" data-action="approve" data-vendor="' + escapeHtml(item.vendor) + '" data-review-id="' + escapeHtml(item.id || "") + '"' + (canApprove ? "" : " disabled") + '>' + (canApprove ? "Approve" : "Approved") + '</button></td></tr>';
       }).join("");
     }
     function homePage() {
+      const apiStatus = apiEnabled() ? '<div id="api-status" class="api-pill ' + (state.apiError ? "error" : "connected") + '">' + escapeHtml(state.apiError || state.apiStatus || "API mode ready") + '</div>' : "";
       return '<main>' +
-        '<section class="hero"><div><div class="eyebrow">Vendor trust operations</div><h1>TRUSTPASS</h1><p>Vendor verification, document review, buyer shortlisting, and procurement-ready trust profiles for B2B teams.</p><div class="actions"><a class="button" href="#/vendor">Vendor workspace</a><a class="button secondary" href="#/buyer">Buyer search</a></div></div>' +
+        '<section class="hero"><div><div class="eyebrow">Vendor trust operations</div><h1>TRUSTPASS</h1><p>Vendor verification, document review, buyer shortlisting, and procurement-ready trust profiles for B2B teams.</p>' + apiStatus + '<div class="actions"><a class="button" href="#/vendor">Vendor workspace</a><a class="button secondary" href="#/buyer">Buyer search</a></div></div>' +
         '<div class="panel"><div class="panel-head"><div><h2>Verified vendors</h2><p style="margin: 4px 0 0">Seeded TRUSTPASS demo data</p></div><strong style="font-size: 28px; color: var(--accent)">3</strong></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Trust</th><th>Status</th></tr></thead><tbody>' +
         vendors.map(function (vendor) { return '<tr><td><strong>' + escapeHtml(vendor.name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.category) + '</span></td><td><strong>' + vendor.score + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.level) + '</span></td><td>' + badge(vendor.status) + '</td></tr>'; }).join("") +
         '</tbody></table></div></div></section>' +
@@ -376,51 +469,105 @@ const html = `<!doctype html>
         render();
       }
     });
-    document.addEventListener("click", function (event) {
+    document.addEventListener("click", async function (event) {
       const button = event.target.closest("[data-action]");
       if (!button) return;
       const action = button.getAttribute("data-action");
       const vendor = button.getAttribute("data-vendor");
-      if (action === "shortlist" && vendor && !state.shortlists.includes(vendor)) {
-        state.shortlists.push(vendor);
+      const vendorId = button.getAttribute("data-vendor-id") || (vendorByName(vendor || "") || {}).id;
+      const reviewId = button.getAttribute("data-review-id");
+      const shouldDisableDuringAction = action !== "reset-demo";
+      if (shouldDisableDuringAction) button.disabled = true;
+      try {
+        if (action === "reset-demo") {
+          if (apiEnabled()) {
+            applyApiState(await apiRequest("/demo/reset", { method: "POST" }));
+            saveState();
+            render();
+          } else {
+            resetState();
+          }
+          return;
+        }
+        if (action === "shortlist" && vendor && !state.shortlists.includes(vendor)) {
+          if (apiEnabled()) {
+            await apiRequest("/demo/buyers/shortlists", { method: "POST", body: JSON.stringify({ vendor_id: vendorId, notes: "Shortlisted from TRUSTPASS demo" }) });
+          }
+          state.shortlists.push(vendor);
+        }
+        if (action === "request" && vendor && !state.requests.includes(vendor)) {
+          if (apiEnabled()) {
+            await apiRequest("/demo/buyers/requests", { method: "POST", body: JSON.stringify({ vendor_id: vendorId, subject: "Need buyer-safe trust summary", message: "Please share current verification and renewal summary." }) });
+          }
+          state.requests.push(vendor);
+        }
+        if (action === "submit-renewal" && !state.renewalSubmitted) {
+          if (apiEnabled()) {
+            const renewal = await apiRequest("/demo/vendor/renewal", { method: "POST" });
+            state.documents = renewal.documents.map(function (doc) {
+              return { name: doc.name, status: humanStatus(doc.status), expiry: doc.expiry };
+            });
+            state.renewalSubmitted = renewal.renewal_submitted;
+          } else {
+            state.renewalSubmitted = true;
+            state.documents = state.documents.map(function (doc) {
+              return doc.name === "Insurance certificate" ? Object.assign({}, doc, { status: "Submitted", expiry: "2027-08-15" }) : doc;
+            });
+          }
+        }
+        if (action === "approve" && vendor) {
+          if (apiEnabled() && reviewId) {
+            await apiRequest("/demo/admin/reviews/" + reviewId + "/approve", { method: "PATCH" });
+          }
+          state.queue = state.queue.map(function (item) {
+            return item.vendor === vendor ? Object.assign({}, item, { status: "Approved", risk: "Low" }) : item;
+          });
+        }
+        if (action === "clear-filters") {
+          state.search = "";
+          state.category = "All";
+        }
+        if (apiEnabled()) {
+          state.apiStatus = "API connected";
+          state.apiError = "";
+        }
+        saveState();
+        render();
+      } catch (error) {
+        state.apiStatus = "API action failed";
+        state.apiError = error.message;
+        saveState();
+        render();
+      } finally {
+        if (!shouldDisableDuringAction && document.contains(button)) {
+          button.disabled = false;
+        }
       }
-      if (action === "request" && vendor && !state.requests.includes(vendor)) {
-        state.requests.push(vendor);
-      }
-      if (action === "submit-renewal" && !state.renewalSubmitted) {
-        state.renewalSubmitted = true;
-        state.documents = state.documents.map(function (doc) {
-          return doc.name === "Insurance certificate" ? Object.assign({}, doc, { status: "Submitted", expiry: "2027-08-15" }) : doc;
-        });
-      }
-      if (action === "approve" && vendor) {
-        state.queue = state.queue.map(function (item) {
-          return item.vendor === vendor ? Object.assign({}, item, { status: "Approved", risk: "Low" }) : item;
-        });
-      }
-      if (action === "clear-filters") {
-        state.search = "";
-        state.category = "All";
-      }
-      if (action === "reset-demo") {
-        resetState();
-        return;
-      }
-      saveState();
-      render();
     });
-    document.addEventListener("submit", function (event) {
+    document.addEventListener("submit", async function (event) {
       if (event.target.id !== "demo-form") return;
       event.preventDefault();
       const data = Object.fromEntries(new FormData(event.target).entries());
-      state.demoRequests.push(data);
-      state.contactSuccess = "Demo request received for " + data.organization + ".";
+      try {
+        if (apiEnabled()) {
+          const request = await apiRequest("/demo/contact/demo-requests", { method: "POST", body: JSON.stringify(data) });
+          state.demoRequests.push(request);
+        } else {
+          state.demoRequests.push(data);
+        }
+        state.contactSuccess = "Demo request received for " + data.organization + ".";
+        state.apiError = "";
+      } catch (error) {
+        state.apiStatus = "API action failed";
+        state.apiError = error.message;
+      }
       saveState();
       render();
     });
     window.TRUSTPASS_DEMO_RESET = resetState;
     addEventListener("hashchange", render);
     render();
+    refreshFromApi();
   </script>
 </body>
 </html>`;

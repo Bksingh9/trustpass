@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "build:pages": "node scripts/build-pages.mjs",
+    "serve:pages": "node scripts/serve-pages.mjs",
+    "test:api-backed": "node scripts/e2e-api-backed.mjs",
     "test:static": "node scripts/e2e-static.mjs",
     "start": "next start",
     "lint": "next lint",

@@ -60,4 +60,30 @@ cd apps/web
 npm run test:static
 ```
 
-GitHub Actions runs both checks on pushes and pull requests.
+Run the API-backed HTTP smoke test while API and local Pages servers are running:
+
+```bash
+cd apps/web
+npm run test:api-backed
+```
+
+Run the API-backed local demo:
+
+```bash
+cd apps/api
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+```bash
+cd apps/web
+npm run build:pages
+PORT=4174 npm run serve:pages
+```
+
+Then open:
+
+```text
+http://127.0.0.1:4174/?api=http%3A%2F%2F127.0.0.1%3A8000%2Fapi%2Fv1#/
+```
+
+GitHub Actions runs API, static Pages, and API-backed web checks on pushes and pull requests.
