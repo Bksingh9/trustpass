@@ -94,3 +94,4 @@
 6. Confirm `/api/operational-proof` reports D1 counts, request logs, audit events, trust score snapshots, and notifications.
 7. Confirm `TRUSTPASS_LIVE_BASE_URL` is a deployed HTTPS Worker URL, not GitHub Pages or localhost.
 8. Confirm the public gateway verifier passes and keeps `https://bksingh9.github.io/trustpass/api/health` as a static `404`.
+9. Confirm the public gateway live write proof creates a vendor, buyer, document, buyer request, and verification decision through the deployed Worker and then re-reads request logs, audit events, trust score snapshots, and notifications.

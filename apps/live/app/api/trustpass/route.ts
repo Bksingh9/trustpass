@@ -392,10 +392,10 @@ export async function POST(request: Request) {
         `${buyer?.name ?? fallbackBuyerName} requested ${subject}`,
         requestId,
       );
-    } else if (action === "decide_verification") {
+    } else if (action === "decide_verification" || action === "record_verification_decision") {
       const vendorId = String(payload.vendor_id ?? "");
       const decision = String(payload.status ?? "").trim();
-      if (!vendorId || !["approved", "rejected", "changes_requested"].includes(decision)) {
+      if (!vendorId || !["approved", "rejected", "changes_requested", "expired"].includes(decision)) {
         return fail("Vendor and valid decision are required");
       }
       const vendor = await db

@@ -106,7 +106,10 @@ API.
 After publishing, the workflow verifies the public GitHub Pages URL itself and
 uploads `trustpass-public-gateway-proof`, which confirms the gateway is live,
 preconnected to the Worker URL, free of seeded demo strings, and still serving
-`/api/health` as a static 404 rather than a fake API.
+`/api/health` as a static 404 rather than a fake API. When a Worker URL is
+configured, the same proof creates a live vendor, buyer, document, buyer
+request, and verification decision through `/api/trustpass`, then re-reads logs,
+audit events, score snapshots, and notifications from D1.
 
 Use the manual `Verify TRUSTPASS Live URL` workflow to re-run the deployed API
 and public gateway proofs against any Worker URL without redeploying. It rejects

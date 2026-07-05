@@ -29,6 +29,8 @@ const requiredSnippets = [
   "Add Document Metadata",
   "Create Buyer Request",
   "Record Verification Decision",
+  'name="document_name"',
+  'postTrustpass("decide_verification"',
   "Vendor Trust Profiles",
   "Request Logs",
   "Audit Events",

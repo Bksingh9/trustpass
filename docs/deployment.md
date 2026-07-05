@@ -79,6 +79,10 @@ The public gateway is served by GitHub Pages from the `gh-pages` branch:
 GitHub Pages is static hosting, so it does not run the API or write to a
 database. It must point at the deployed Worker/D1 API through
 `TRUSTPASS_LIVE_BASE_URL` before it counts as a live real-data surface.
+After that connection exists, the public gateway writes through the Worker API;
+the public gateway proof creates and re-reads live vendor, buyer, document,
+buyer request, verification decision, log, audit, score snapshot, and
+notification records.
 The same-origin Pages path `https://bksingh9.github.io/trustpass/api/health`
 must remain a static `404`; the real live API is the separate Cloudflare Worker
 URL verified by `.github/workflows/live-app.yml` and

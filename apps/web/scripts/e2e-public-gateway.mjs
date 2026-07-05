@@ -30,6 +30,8 @@ const requiredSnippets = [
   "Add Document Metadata",
   "Create Buyer Request",
   "Record Verification Decision",
+  'name="document_name"',
+  'postTrustpass("decide_verification"',
   "Request Logs",
   "Audit Events",
   "Trust Score History",
@@ -44,6 +46,7 @@ const expectedLiveBaseUrl = process.env.TRUSTPASS_LIVE_BASE_URL
   : "";
 const proofOutputPath = process.env.TRUSTPASS_PUBLIC_GATEWAY_PROOF_PATH || "";
 const skipLiveApiChecks = process.env.TRUSTPASS_PUBLIC_GATEWAY_SKIP_LIVE_API === "1";
+const skipWriteProof = process.env.TRUSTPASS_PUBLIC_GATEWAY_SKIP_WRITE_PROOF === "1";
 const attempts = Number(process.env.TRUSTPASS_PUBLIC_GATEWAY_ATTEMPTS || 30);
 const delayMs = Number(process.env.TRUSTPASS_PUBLIC_GATEWAY_DELAY_MS || 3000);
 const expectedPagesApiHealthStatus = Number(process.env.TRUSTPASS_PUBLIC_GATEWAY_API_HEALTH_STATUS || 404);
@@ -70,8 +73,8 @@ async function delay() {
   await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
-async function fetchText(url, expectedStatuses = [200]) {
-  const response = await fetch(url, { cache: "no-store" });
+async function fetchText(url, expectedStatuses = [200], options = {}) {
+  const response = await fetch(url, { cache: "no-store", ...options });
   const text = await response.text();
   assert(
     expectedStatuses.includes(response.status),
@@ -80,8 +83,8 @@ async function fetchText(url, expectedStatuses = [200]) {
   return { response, text };
 }
 
-async function fetchJson(url, expectedStatuses = [200]) {
-  const result = await fetchText(url, expectedStatuses);
+async function fetchJson(url, expectedStatuses = [200], options = {}) {
+  const result = await fetchText(url, expectedStatuses, options);
   let body;
   try {
     body = JSON.parse(result.text);
@@ -121,12 +124,49 @@ function assertGatewayHtml(text, label) {
   }
 }
 
+function findByName(rows, name) {
+  return rows.find((row) => row.name === name);
+}
+
+function assertRequestId(result, requestId, label) {
+  const headerRequestId = result.response.headers.get("x-request-id");
+  assert(headerRequestId === requestId, `${label} x-request-id mismatch: expected ${requestId}, got ${headerRequestId}`);
+  assert(result.body?.request_id === requestId, `${label} response body request_id mismatch`);
+}
+
 const proof = {
   publicGatewayUrl,
   expectedLiveBaseUrl,
   startedAt: new Date().toISOString(),
   checks: [],
 };
+
+async function postTrustpassAction(action, payload, requestId) {
+  const result = await fetchJson(
+    urlFor(expectedLiveBaseUrl, "api/trustpass"),
+    [201],
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: new URL(publicGatewayUrl).origin,
+        "x-request-id": requestId,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    },
+  );
+  assertRequestId(result, requestId, action);
+  assert(result.body?.data, `${action} response is missing live state data`);
+  assert(
+    result.body.data.request_logs.some((log) => log.request_id === requestId && log.status === 201),
+    `${action} did not persist a request log`,
+  );
+  assert(
+    result.body.data.audit_events.some((event) => event.request_id === requestId),
+    `${action} did not persist an audit event`,
+  );
+  return result.body.data;
+}
 
 const root = await retry(async () => {
   const result = await fetchText(publicGatewayUrl);
@@ -155,6 +195,28 @@ proof.pagesApiHealth = {
 };
 
 if (expectedLiveBaseUrl && !skipLiveApiChecks) {
+  const preflight = await fetchText(
+    urlFor(expectedLiveBaseUrl, "api/trustpass"),
+    [204],
+    {
+      method: "OPTIONS",
+      headers: {
+        origin: new URL(publicGatewayUrl).origin,
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-request-id",
+      },
+    },
+  );
+  assert(preflight.response.headers.get("access-control-allow-origin") === "*", "live API preflight is missing CORS");
+  assert(
+    preflight.response.headers.get("access-control-allow-methods")?.includes("POST"),
+    "live API preflight does not allow POST",
+  );
+  proof.checks.push("live_cors_preflight");
+  proof.preflight = {
+    status: preflight.response.status,
+  };
+
   const liveHealth = await fetchJson(urlFor(expectedLiveBaseUrl, "api/health"));
   assert(liveHealth.body?.service === "trustpass-live", "live API health did not identify trustpass-live");
   assert(liveHealth.body?.demo_data_enabled === false, "live API health reports demo data enabled");
@@ -198,6 +260,182 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
     counts: operationalProof.body.counts,
     invariants: operationalProof.body.invariants,
   };
+
+  if (!skipWriteProof) {
+    const runId = `public-gateway-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const vendorName = `TRUSTPASS Public Vendor ${runId}`;
+    const buyerName = `TRUSTPASS Public Buyer ${runId}`;
+    const documentName = `Public compliance packet ${runId}`;
+    const requestSubject = `Public gateway request ${runId}`;
+    const requestIds = {
+      vendor: `${runId}-vendor`,
+      buyer: `${runId}-buyer`,
+      document: `${runId}-document`,
+      request: `${runId}-request`,
+      decision: `${runId}-decision`,
+      finalRead: `${runId}-final-read`,
+      finalProof: `${runId}-final-proof`,
+    };
+
+    let state = await postTrustpassAction(
+      "create_vendor",
+      {
+        name: vendorName,
+        category: "Public gateway proof",
+        location: "GitHub Pages",
+        contact_email: `${runId}@trustpass.example`,
+      },
+      requestIds.vendor,
+    );
+    const vendor = findByName(state.vendors, vendorName);
+    assert(vendor, "public write proof created vendor was not returned");
+
+    state = await postTrustpassAction(
+      "create_buyer",
+      {
+        name: buyerName,
+        category: "Procurement",
+        location: "GitHub Pages",
+        contact_email: `${runId}-buyer@trustpass.example`,
+      },
+      requestIds.buyer,
+    );
+    const buyer = findByName(state.buyers, buyerName);
+    assert(buyer, "public write proof created buyer was not returned");
+
+    state = await postTrustpassAction(
+      "add_document",
+      {
+        vendor_id: vendor.id,
+        document_name: documentName,
+        status: "submitted",
+        expiry_date: "2027-07-05",
+      },
+      requestIds.document,
+    );
+    assert(
+      state.documents.some((document) => document.document_name === documentName && document.organization_id === vendor.id),
+      "public write proof document was not persisted",
+    );
+
+    state = await postTrustpassAction(
+      "create_buyer_request",
+      {
+        buyer_id: buyer.id,
+        vendor_id: vendor.id,
+        subject: requestSubject,
+        message: "Public gateway live write proof.",
+      },
+      requestIds.request,
+    );
+    const buyerRequest = state.buyer_requests.find((request) => request.subject === requestSubject);
+    assert(buyerRequest, "public write proof buyer request was not returned");
+    assert(buyerRequest.buyer_id === buyer.id, "public write proof buyer request is not linked to the buyer");
+    assert(
+      state.notifications.some(
+        (notification) => notification.request_id === requestIds.request && notification.type === "buyer_request",
+      ),
+      "public write proof buyer request notification was not persisted",
+    );
+
+    state = await postTrustpassAction(
+      "decide_verification",
+      {
+        vendor_id: vendor.id,
+        status: "approved",
+        trust_score: 91,
+        notes: `Approved through public gateway proof ${runId}`,
+      },
+      requestIds.decision,
+    );
+    const updatedVendor = state.vendors.find((row) => row.id === vendor.id);
+    assert(updatedVendor?.verification_status === "approved", "public write proof vendor status was not updated");
+    assert(updatedVendor?.trust_score === 91, "public write proof vendor score was not updated");
+    assert(
+      state.trust_score_snapshots.some(
+        (snapshot) =>
+          snapshot.vendor_id === vendor.id &&
+          snapshot.score === 91 &&
+          snapshot.evidence_request_id === requestIds.decision,
+      ),
+      "public write proof trust score snapshot was not persisted",
+    );
+    assert(
+      state.notifications.some(
+        (notification) =>
+          notification.request_id === requestIds.decision && notification.type === "verification_decision",
+      ),
+      "public write proof verification notification was not persisted",
+    );
+
+    const finalState = await fetchJson(
+      urlFor(expectedLiveBaseUrl, "api/trustpass"),
+      [200],
+      {
+        headers: {
+          "x-request-id": requestIds.finalRead,
+        },
+      },
+    );
+    assertRequestId(finalState, requestIds.finalRead, "public write final read");
+    assert(finalState.body.data.vendors.some((row) => row.id === vendor.id), "final read lost public proof vendor");
+    assert(finalState.body.data.buyers.some((row) => row.id === buyer.id), "final read lost public proof buyer");
+    assert(
+      finalState.body.data.documents.some((document) => document.document_name === documentName),
+      "final read lost public proof document",
+    );
+    assert(
+      finalState.body.data.buyer_requests.some((request) => request.subject === requestSubject),
+      "final read lost public proof buyer request",
+    );
+    assert(
+      finalState.body.data.audit_events.some((event) => event.request_id === requestIds.decision),
+      "final read lost public proof decision audit event",
+    );
+    assert(
+      finalState.body.data.request_logs.some((log) => log.request_id === requestIds.finalRead),
+      "final read did not log the public proof read",
+    );
+
+    const finalOperationalProof = await fetchJson(
+      urlFor(expectedLiveBaseUrl, "api/operational-proof"),
+      [200],
+      {
+        headers: {
+          "x-request-id": requestIds.finalProof,
+        },
+      },
+    );
+    assertRequestId(finalOperationalProof, requestIds.finalProof, "public write final operational proof");
+    assert(finalOperationalProof.body?.invariants?.has_request_logs === true, "final proof has no request logs");
+    assert(finalOperationalProof.body?.invariants?.has_audit_events === true, "final proof has no audit events");
+    assert(finalOperationalProof.body?.invariants?.has_score_snapshots === true, "final proof has no score snapshots");
+    assert(finalOperationalProof.body?.invariants?.has_notifications === true, "final proof has no notifications");
+
+    proof.checks.push("public_gateway_live_write_proof");
+    proof.publicGatewayWriteProof = {
+      runId,
+      requestIds,
+      vendor: { id: vendor.id, name: vendorName },
+      buyer: { id: buyer.id, name: buyerName },
+      document: { name: documentName },
+      buyerRequest: { subject: requestSubject, buyerId: buyer.id, vendorId: vendor.id },
+      decision: { vendorId: vendor.id, status: updatedVendor.verification_status, trustScore: updatedVendor.trust_score },
+      finalCounts: {
+        vendors: finalState.body.data.vendors.length,
+        buyers: finalState.body.data.buyers.length,
+        documents: finalState.body.data.documents.length,
+        buyerRequests: finalState.body.data.buyer_requests.length,
+        trustScoreSnapshots: finalState.body.data.trust_score_snapshots.length,
+        notifications: finalState.body.data.notifications.length,
+        auditEvents: finalState.body.data.audit_events.length,
+        requestLogs: finalState.body.data.request_logs.length,
+      },
+      operationalInvariants: finalOperationalProof.body.invariants,
+    };
+  }
 }
 
 proof.completedAt = new Date().toISOString();
