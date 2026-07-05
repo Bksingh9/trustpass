@@ -1,0 +1,1 @@
+ALTER TABLE `audit_events` ADD `request_id` text DEFAULT '' NOT NULL;
