@@ -37,10 +37,14 @@ the same request ID for operational sanity checks.
 
 ## Live Acceptance Gate
 
-Set the repository variable `TRUSTPASS_LIVE_BASE_URL` to the deployed Worker URL
-after a real host is available. The `TRUSTPASS Live App` workflow will run the
-same end-to-end proof against that deployed URL.
+Use the manual `Deploy TRUSTPASS Live Worker` GitHub Actions workflow to deploy
+the Worker to Cloudflare, apply the D1 migrations, and run the same end-to-end
+proof against the deployed URL.
 
 The GitHub Pages URL is not a valid value for `TRUSTPASS_LIVE_BASE_URL`; it is a
-static demo and does not expose `/api/health`, `/api/readiness`, or D1-backed
+static gateway and does not expose `/api/health`, `/api/readiness`, or D1-backed
 write APIs.
+
+After deployment, set the repository variable `TRUSTPASS_LIVE_BASE_URL` to the
+deployed Worker URL. The `TRUSTPASS Live App` workflow will run the deployed
+acceptance proof on future pushes.

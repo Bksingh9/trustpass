@@ -1,0 +1,82 @@
+name: Deploy TRUSTPASS Live Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker_name:
+        description: Cloudflare Worker name to deploy.
+        required: true
+        default: trustpass-live
+        type: string
+      d1_database_name:
+        description: Existing Cloudflare D1 database name.
+        required: true
+        default: trustpass-live
+        type: string
+      d1_database_id:
+        description: Existing Cloudflare D1 database ID.
+        required: true
+        type: string
+      live_base_url:
+        description: Public deployed Worker URL, ending at the app root.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trustpass-live-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy and prove live data path
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/live
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TRUSTPASS_WORKER_NAME: ${{ inputs.worker_name }}
+      TRUSTPASS_D1_DATABASE_NAME: ${{ inputs.d1_database_name }}
+      TRUSTPASS_D1_DATABASE_ID: ${{ inputs.d1_database_id }}
+      TRUSTPASS_LIVE_BASE_URL: ${{ inputs.live_base_url }}
+      TRUSTPASS_REQUIRE_CORS_PREFLIGHT: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/live/package-lock.json
+
+      - name: Check Cloudflare deployment credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_ACCOUNT_ID}"
+          test -n "${CLOUDFLARE_API_TOKEN}"
+
+      - name: Install live app dependencies
+        run: npm ci
+
+      - name: Build Worker app
+        run: npm run build
+
+      - name: Prepare production Wrangler config
+        run: node scripts/prepare-cloudflare-deploy.mjs
+
+      - name: Apply D1 migrations
+        shell: bash
+        run: npx wrangler d1 migrations apply "${TRUSTPASS_D1_DATABASE_NAME}" --remote --config dist/server/wrangler.json
+
+      - name: Deploy Worker
+        run: npx wrangler deploy --config dist/server/wrangler.json
+
+      - name: Run deployed live E2E proof
+        run: npm run e2e:live
