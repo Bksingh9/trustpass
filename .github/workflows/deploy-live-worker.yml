@@ -92,6 +92,9 @@ jobs:
       - name: Resolve deployed API URL
         run: node scripts/resolve-live-base-url.mjs --deploy-log deploy-output.log
 
+      - name: Require deployed Worker API URL
+        run: node scripts/require-live-base-url.mjs
+
       - name: Run deployed live E2E proof
         env:
           TRUSTPASS_LIVE_PROOF_PATH: live-e2e-proof.json

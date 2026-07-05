@@ -37,6 +37,11 @@ jobs:
       - name: Install live app dependencies
         run: npm ci
 
+      - name: Require Worker API URL
+        env:
+          TRUSTPASS_LIVE_BASE_URL: ${{ inputs.live_base_url }}
+        run: node scripts/require-live-base-url.mjs
+
       - name: Verify live API data path
         env:
           TRUSTPASS_LIVE_BASE_URL: ${{ inputs.live_base_url }}
