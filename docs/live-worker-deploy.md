@@ -86,6 +86,10 @@ not require a separate Pages rebuild before the public site can use the live API
 It also attempts to save the same URL as repository variable
 `TRUSTPASS_LIVE_BASE_URL` so future push workflows keep testing the deployed
 API.
+After publishing, the workflow verifies the public GitHub Pages URL itself and
+uploads `trustpass-public-gateway-proof`, which confirms the gateway is live,
+preconnected to the Worker URL, free of seeded demo strings, and still serving
+`/api/health` as a static 404 rather than a fake API.
 
 ## References
 

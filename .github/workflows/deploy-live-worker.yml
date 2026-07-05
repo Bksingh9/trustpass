@@ -156,3 +156,24 @@ jobs:
 
           git commit -m "Deploy live TRUSTPASS gateway for ${GITHUB_SHA}"
           git push origin HEAD:gh-pages
+
+      - name: Restore source checkout
+        if: github.ref == 'refs/heads/main'
+        working-directory: .
+        run: git switch --detach "${GITHUB_SHA}"
+
+      - name: Verify published public gateway
+        if: github.ref == 'refs/heads/main'
+        working-directory: .
+        env:
+          TRUSTPASS_PUBLIC_GATEWAY_URL: https://bksingh9.github.io/trustpass/
+          TRUSTPASS_PUBLIC_GATEWAY_PROOF_PATH: apps/web/public-gateway-proof.json
+        run: node apps/web/scripts/e2e-public-gateway.mjs
+
+      - name: Upload public gateway proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustpass-public-gateway-proof
+          path: apps/web/public-gateway-proof.json
+          if-no-files-found: warn
