@@ -38,11 +38,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run dev -- --host 127.0.0.1 --port 4180 > live-dev.log 2>&1 &
+          npm run dev -- --host localhost --port 4180 > live-dev.log 2>&1 &
           echo "$!" > live-dev.pid
 
       - name: Run live D1 E2E proof
-        run: npm run e2e:live -- --base-url http://127.0.0.1:4180/
+        run: npm run e2e:live -- --base-url http://localhost:4180/
 
       - name: Show local Worker logs
         if: always()
