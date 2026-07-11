@@ -11,6 +11,13 @@
 - Tenant-owned records are filtered by organization.
 - Audit events are written for important state changes.
 
+## Repository Security
+
+- `SECURITY.md`, `LICENSE`, and `CONTRIBUTING.md` are present.
+- Dependabot covers GitHub Actions, API Python dependencies, and Node app dependencies.
+- CodeQL runs for Python and JavaScript/TypeScript on pushes, pull requests, weekly schedule, and manual dispatch.
+- Code scanning uploads security events successfully on the public repository.
+
 ## Vendor Flow
 
 - Signup/login works through Supabase.
