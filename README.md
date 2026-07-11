@@ -15,7 +15,7 @@ TRUSTPASS is a B2B vendor trust, verification, and onboarding platform. It helps
 - Vulnerability reporting: see `SECURITY.md`.
 - Contribution workflow: see `CONTRIBUTING.md`.
 - Public launch checks should include tests, the deployed API proof, the public gateway proof, CodeRabbit review when authenticated, and security hardening review for auth, tenancy, audit, and data-classification boundaries.
-- Deployed proof helpers require `SEED_CONTEXT_TOKEN` on the API host and matching GitHub secret `TRUSTPASS_SEED_CONTEXT_TOKEN`; leaving it unset disables seeded context resolution in production.
+- The optional `/admin/seed-context` helper requires `SEED_CONTEXT_TOKEN` on the API host and matching GitHub secret `TRUSTPASS_SEED_CONTEXT_TOKEN`; leaving it unset disables the helper in production. The deployed E2E proof computes deterministic seed IDs locally and does not require this helper.
 - Auth boundary: `AUTH_MODE=auto` uses development headers locally and Supabase JWT verification in production. The public demo/proof Render service explicitly sets `AUTH_MODE=development_headers`; real customer production should use `AUTH_MODE=supabase_jwt` with `SUPABASE_PROJECT_URL` and `SUPABASE_PUBLISHABLE_KEY`.
 
 This repository is structured as a production-oriented MVP:

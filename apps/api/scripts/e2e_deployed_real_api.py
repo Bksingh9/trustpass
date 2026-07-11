@@ -10,7 +10,7 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 
 def normalize_base_url(value: str) -> str:
@@ -92,36 +92,21 @@ def assert_request_id(headers: dict[str, str], request_id: str) -> None:
     )
 
 
-def resolve_seed_context(base_url: str, run_id: str) -> tuple[dict[str, str], dict[str, str]]:
-    request_id = f"{run_id}-seed-context"
-    seed_context_token = os.getenv("TRUSTPASS_SEED_CONTEXT_TOKEN", "")
-    seed_context_headers = {
-        "authorization": "Bearer seed-admin-2",
-        "x-trustpass-roles": "super_admin",
-        "x-request-id": request_id,
-    }
-    if seed_context_token:
-        seed_context_headers["x-trustpass-seed-context-token"] = seed_context_token
+def stable_seed_id(kind: str, key: str) -> str:
+    return str(uuid5(NAMESPACE_URL, f"trustpass:seed:{kind}:{key}"))
 
-    _, response, headers = request_json(
-        base_url,
-        "GET",
-        "/admin/seed-context",
-        headers=seed_context_headers,
-    )
-    assert_request_id(headers, request_id)
-    data = response["data"]
-    ids = {
-        "buyer_org": data["organizations"]["brightline-procurement"],
-        "atlas_org": data["organizations"]["atlas-freight-partners"],
-        "clearpath_org": data["organizations"]["clearpath-advisory"],
-        "internal_org": data["organizations"]["trustpass-ops"],
-        "buyer_user": data["users"]["seed-buyer-1"],
-        "clearpath_user": data["users"]["seed-vendor-3"],
-        "admin_user": data["users"]["seed-admin-2"],
-        "category_compliance_document_type": data["document_types"]["category_compliance"],
+
+def resolve_seed_context() -> dict[str, str]:
+    return {
+        "buyer_org": stable_seed_id("organization", "brightline-procurement"),
+        "atlas_org": stable_seed_id("organization", "atlas-freight-partners"),
+        "clearpath_org": stable_seed_id("organization", "clearpath-advisory"),
+        "internal_org": stable_seed_id("organization", "trustpass-ops"),
+        "buyer_user": stable_seed_id("user", "seed-buyer-1"),
+        "clearpath_user": stable_seed_id("user", "seed-vendor-3"),
+        "admin_user": stable_seed_id("user", "seed-admin-2"),
+        "category_compliance_document_type": stable_seed_id("document_type", "category_compliance"),
     }
-    return ids, headers
 
 
 def main() -> None:
@@ -155,9 +140,8 @@ def main() -> None:
     request_json(base_url, "GET", "/demo/health", expected_statuses={404})
     proof["checks"].append("demo_routes_disabled")
 
-    ids, seed_context_headers = resolve_seed_context(base_url, run_id)
-    proof["requestIds"]["seedContext"] = seed_context_headers.get("x-request-id")
-    proof["checks"].append("seed_context")
+    ids = resolve_seed_context()
+    proof["checks"].append("deterministic_seed_context")
 
     buyer_headers = context_headers(
         auth_subject_id="seed-buyer-1",

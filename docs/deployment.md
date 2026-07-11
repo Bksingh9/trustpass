@@ -41,10 +41,9 @@ to `development_headers` elsewhere. The public Render demo/proof service sets
 `AUTH_MODE=development_headers` explicitly because its seeded E2E workflows use
 deterministic non-customer users. Do not use development-header mode for real
 customer production.
-`SEED_CONTEXT_TOKEN` protects the seeded proof-context helper in production. Set
-the same value as the GitHub Actions secret `TRUSTPASS_SEED_CONTEXT_TOKEN` when
-running deployed end-to-end proof workflows. Leave it unset to disable that
-helper in production.
+`SEED_CONTEXT_TOKEN` protects the optional seeded proof-context helper in
+production. Leave it unset to disable that helper. The default deployed E2E
+proof computes deterministic seed IDs locally and does not require the helper.
 
 ## Database
 
@@ -97,10 +96,10 @@ public HTTPS API and a durable database. The preferred no-Cloudflare path is:
 - Bootstrap: `TRUSTPASS_SEED_ON_START=true` runs migrations plus realistic
   verification seed records so the deployed E2E can authenticate deterministic
   buyer, vendor, and admin contexts, then create fresh live records.
-- Seed context helper: `SEED_CONTEXT_TOKEN` must be set in Render and mirrored
-  as GitHub secret `TRUSTPASS_SEED_CONTEXT_TOKEN` before deployed proof
-  workflows can resolve deterministic seed IDs. This token is not a user auth
-  token; it only gates the proof helper.
+- Seed context helper: `SEED_CONTEXT_TOKEN` is optional. When set in Render and
+  mirrored as GitHub secret `TRUSTPASS_SEED_CONTEXT_TOKEN`, it allows the
+  protected `/admin/seed-context` route to expose deterministic proof IDs. The
+  default deployed proof does not require it.
 - Verification: `.github/workflows/verify-deployed-api.yml` targets
   `https://trustpass-api.onrender.com` by default. Set repository variable
   `TRUSTPASS_API_BASE_URL` only when replacing that Render URL.
