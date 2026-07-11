@@ -42,6 +42,8 @@ In scope:
 - audit log tampering or missing audit events for privileged actions
 - public gateway write access without admin authorization
 - secrets in source, workflows, logs, or generated artifacts
+- production deployments using `AUTH_MODE=development_headers` for real customer
+  data
 
 Out of scope:
 

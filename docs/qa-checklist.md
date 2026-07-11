@@ -79,12 +79,13 @@
 
 1. Deploy `render.yaml` with the `trustpass-api` service and `trustpass-postgres` database on explicit free Render plans.
 2. Confirm production env has `ENABLE_DEMO_ROUTES=false` and `TRUSTPASS_SEED_ON_START=true` for bootstrap verification.
-3. Set repository variable `TRUSTPASS_API_BASE_URL` to the deployed API URL.
-4. Run `.github/workflows/verify-deployed-api.yml` or `python apps/api/scripts/e2e_deployed_real_api.py --base-url <api-url>`.
-5. Confirm `/api/v1/health` and `/api/v1/readiness` pass on the public HTTPS API.
-6. Confirm `/api/v1/demo/health` returns `404`.
-7. Confirm the deployed proof creates live shortlist, buyer request, document, review, verification decision, audit events, and activity logs through production routes.
-8. Confirm every proof response has an `x-request-id`.
+3. Confirm public demo/proof hosts explicitly set `AUTH_MODE=development_headers`; real customer production hosts must use `AUTH_MODE=supabase_jwt` with Supabase URL and publishable key configured.
+4. Set repository variable `TRUSTPASS_API_BASE_URL` to the deployed API URL.
+5. Run `.github/workflows/verify-deployed-api.yml` or `python apps/api/scripts/e2e_deployed_real_api.py --base-url <api-url>`.
+6. Confirm `/api/v1/health` and `/api/v1/readiness` pass on the public HTTPS API.
+7. Confirm `/api/v1/demo/health` returns `404`.
+8. Confirm the deployed proof creates live shortlist, buyer request, document, review, verification decision, audit events, and activity logs through production routes.
+9. Confirm every proof response has an `x-request-id`.
 
 ## API-Backed Browser Demo
 

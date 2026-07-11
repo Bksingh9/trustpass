@@ -95,7 +95,13 @@ All backend APIs are versioned under `/api/v1`.
 
 ## Auth And RBAC
 
-Supabase Auth is the identity provider. The backend validates the incoming auth token, maps the Supabase subject to `users.auth_subject_id`, and loads active memberships.
+Supabase Auth is the identity provider for real production. With
+`AUTH_MODE=supabase_jwt`, the backend validates the bearer token with Supabase
+Auth, maps the Supabase subject to `users.auth_subject_id`, and derives roles
+from active `memberships`. Local development and the public seeded proof
+environment can explicitly use `AUTH_MODE=development_headers`, which trusts
+deterministic headers for repeatable tests and must not be used for real
+customer production.
 
 Access rules:
 
@@ -195,4 +201,3 @@ Production deployment can split the same components across managed services:
 - Redis on managed cache/queue service.
 - S3-compatible object storage.
 - Supabase Auth project.
-

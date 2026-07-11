@@ -26,8 +26,10 @@ class Settings(BaseSettings):
     )
 
     supabase_project_url: str | None = None
+    supabase_publishable_key: str | None = None
     supabase_jwt_audience: str = "authenticated"
     supabase_jwt_issuer: str | None = None
+    auth_mode: str = "auto"
 
     storage_provider: str = "local"
     local_storage_root: str = "./.data/uploads"

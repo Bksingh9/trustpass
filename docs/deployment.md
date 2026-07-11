@@ -29,10 +29,18 @@ For production API deployments, set:
 ```bash
 ENVIRONMENT=production
 ENABLE_DEMO_ROUTES=false
+AUTH_MODE=supabase_jwt
+SUPABASE_PROJECT_URL=https://<project-id>.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<publishable key>
 SEED_CONTEXT_TOKEN=<shared deployed-proof secret>
 ```
 
 That keeps `/api/v1/demo/*` out of the public API while preserving the local and CI demo contract when explicitly enabled.
+`AUTH_MODE=auto` resolves to `supabase_jwt` when `ENVIRONMENT=production` and
+to `development_headers` elsewhere. The public Render demo/proof service sets
+`AUTH_MODE=development_headers` explicitly because its seeded E2E workflows use
+deterministic non-customer users. Do not use development-header mode for real
+customer production.
 `SEED_CONTEXT_TOKEN` protects the seeded proof-context helper in production. Set
 the same value as the GitHub Actions secret `TRUSTPASS_SEED_CONTEXT_TOKEN` when
 running deployed end-to-end proof workflows. Leave it unset to disable that
@@ -82,6 +90,10 @@ public HTTPS API and a durable database. The preferred no-Cloudflare path is:
 - Database: Render managed PostgreSQL from `render.yaml` on the explicit `free`
   database plan.
 - Demo routes: disabled with `ENABLE_DEMO_ROUTES=false`.
+- Auth mode: the public demo/proof host uses `AUTH_MODE=development_headers` by
+  design for deterministic seed users. A real customer production host should
+  remove that override and configure `AUTH_MODE=supabase_jwt`,
+  `SUPABASE_PROJECT_URL`, and `SUPABASE_PUBLISHABLE_KEY`.
 - Bootstrap: `TRUSTPASS_SEED_ON_START=true` runs migrations plus realistic
   verification seed records so the deployed E2E can authenticate deterministic
   buyer, vendor, and admin contexts, then create fresh live records.

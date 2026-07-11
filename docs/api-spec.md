@@ -2,7 +2,13 @@
 
 Base path: `/api/v1`
 
-All authenticated routes expect a Supabase bearer token. During local development, the backend also accepts development headers for user, organization, and role context until the Supabase JWT verifier is wired.
+All authenticated routes expect `Authorization: Bearer <token>`.
+
+Auth modes:
+
+- `AUTH_MODE=auto`: uses development headers outside production and Supabase JWT verification in production.
+- `AUTH_MODE=development_headers`: trusts `x-trustpass-user-id`, `x-trustpass-organization-id`, and `x-trustpass-roles`. Use only for local development and deterministic public demo/proof workflows.
+- `AUTH_MODE=supabase_jwt`: verifies the bearer token against Supabase Auth, maps the Supabase user ID to `users.auth_subject_id`, and derives active roles from `memberships`. In this mode, requested organization context is accepted only when the authenticated user has an active membership in that organization.
 
 ## Response Format
 

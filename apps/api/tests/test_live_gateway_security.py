@@ -10,7 +10,11 @@ from fastapi.testclient import TestClient
 from app.api.v1.routes.admin import _authorize_seed_context
 from app.api.v1.routes.live_gateway import _authorize_gateway_writer, _state_metadata
 from app.core.config import Settings
-from app.core.security import UserContext
+from app.core.security import (
+    UserContext,
+    _context_from_memberships,
+    _resolve_auth_mode,
+)
 from app.main import create_app
 from app.models.enums import MembershipRole, MembershipStatus, UserStatus
 
@@ -46,6 +50,25 @@ class _FakeDb:
         return _ScalarResult(self.values.pop(0))
 
 
+class _ScalarListResult:
+    def __init__(self, values):
+        self.values = values
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return self.values
+
+
+class _FakeDbForMemberships:
+    def __init__(self, user, memberships):
+        self.values = [_ScalarResult(user), _ScalarListResult(memberships)]
+
+    def execute(self, _statement):
+        return self.values.pop(0)
+
+
 def _context(
     *,
     roles: tuple[str, ...],
@@ -68,6 +91,24 @@ def test_live_gateway_post_requires_authorization_header() -> None:
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Missing Authorization header"
+
+
+def test_auth_mode_auto_defaults_to_supabase_jwt_in_production() -> None:
+    settings = Settings(environment="production", auth_mode="auto")
+
+    assert _resolve_auth_mode(settings) == "supabase_jwt"
+
+
+def test_auth_mode_auto_keeps_development_headers_outside_production() -> None:
+    settings = Settings(environment="local", auth_mode="auto")
+
+    assert _resolve_auth_mode(settings) == "development_headers"
+
+
+def test_auth_mode_can_explicitly_allow_development_headers_for_demo_proof() -> None:
+    settings = Settings(environment="production", auth_mode="development_headers")
+
+    assert _resolve_auth_mode(settings) == "development_headers"
 
 
 def test_live_gateway_writer_rejects_non_admin_role() -> None:
@@ -160,6 +201,45 @@ def test_live_gateway_writer_accepts_active_admin_membership() -> None:
     )
 
     assert actor is user
+
+
+def test_supabase_mode_derives_roles_from_active_membership_not_headers() -> None:
+    user = _User(id=uuid4(), auth_subject_id="supabase-user")
+    organization_id = uuid4()
+    membership = _Membership(
+        user_id=user.id,
+        organization_id=organization_id,
+        role=MembershipRole.buyer,
+    )
+
+    context = _context_from_memberships(
+        _FakeDbForMemberships(user, [membership]),
+        auth_subject_id="supabase-user",
+        requested_organization_id=organization_id,
+    )
+
+    assert context.user_id == user.id
+    assert context.organization_id == organization_id
+    assert context.roles == ("buyer",)
+
+
+def test_supabase_mode_rejects_spoofed_organization_context() -> None:
+    user = _User(id=uuid4(), auth_subject_id="supabase-user")
+    membership = _Membership(
+        user_id=user.id,
+        organization_id=uuid4(),
+        role=MembershipRole.buyer,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        _context_from_memberships(
+            _FakeDbForMemberships(user, [membership]),
+            auth_subject_id="supabase-user",
+            requested_organization_id=uuid4(),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Authenticated organization context mismatch"
 
 
 def test_live_gateway_state_metadata_marks_seed_and_qa_records_as_synthetic() -> None:
