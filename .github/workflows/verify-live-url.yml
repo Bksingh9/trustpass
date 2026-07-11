@@ -73,6 +73,7 @@ jobs:
         env:
           TRUSTPASS_PUBLIC_GATEWAY_URL: ${{ inputs.public_gateway_url }}
           TRUSTPASS_LIVE_BASE_URL: ${{ inputs.live_base_url }}
+          TRUSTPASS_SEED_CONTEXT_TOKEN: ${{ secrets.TRUSTPASS_SEED_CONTEXT_TOKEN }}
           TRUSTPASS_PUBLIC_GATEWAY_PROOF_PATH: apps/web/public-gateway-live-url-proof.json
         run: node apps/web/scripts/e2e-public-gateway.mjs
 

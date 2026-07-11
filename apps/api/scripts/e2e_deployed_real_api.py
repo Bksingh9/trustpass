@@ -94,15 +94,20 @@ def assert_request_id(headers: dict[str, str], request_id: str) -> None:
 
 def resolve_seed_context(base_url: str, run_id: str) -> tuple[dict[str, str], dict[str, str]]:
     request_id = f"{run_id}-seed-context"
+    seed_context_token = os.getenv("TRUSTPASS_SEED_CONTEXT_TOKEN", "")
+    seed_context_headers = {
+        "authorization": "Bearer seed-admin-2",
+        "x-trustpass-roles": "super_admin",
+        "x-request-id": request_id,
+    }
+    if seed_context_token:
+        seed_context_headers["x-trustpass-seed-context-token"] = seed_context_token
+
     _, response, headers = request_json(
         base_url,
         "GET",
         "/admin/seed-context",
-        headers={
-            "authorization": "Bearer seed-admin-2",
-            "x-trustpass-roles": "super_admin",
-            "x-request-id": request_id,
-        },
+        headers=seed_context_headers,
     )
     assert_request_id(headers, request_id)
     data = response["data"]

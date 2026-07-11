@@ -24,6 +24,8 @@ const requiredSnippets = [
   "buildConfiguredApiBaseUrl",
   "Admin Write Access",
   "Writes require an authorized TRUSTPASS admin context.",
+  "Data classification",
+  "Customer data assessment",
   "/api/health",
   "/api/readiness",
   "/api/trustpass",

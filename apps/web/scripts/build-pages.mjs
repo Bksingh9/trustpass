@@ -238,6 +238,7 @@ const html = `<!doctype html>
         audit_events: [],
         request_logs: []
       },
+      meta: null,
       loading: false,
       error: "",
       lastRequestId: ""
@@ -300,6 +301,16 @@ const html = `<!doctype html>
         ["Notifications", state.data.notifications.length]
       ];
     }
+    function dataSummary() {
+      return state.meta || (state.proof && state.proof.data_summary) || null;
+    }
+    function dataSummaryLabel(key, fallback) {
+      const summary = dataSummary();
+      const value = summary && summary[key];
+      if (value === false) return "No";
+      if (value === true) return "Yes";
+      return human(value || fallback || "Not reported");
+    }
     async function refreshLiveData() {
       if (!state.apiBaseUrl) {
         render();
@@ -313,7 +324,11 @@ const html = `<!doctype html>
         state.readiness = await fetchJson("/api/readiness");
         const current = await fetchJson("/api/trustpass");
         state.data = Object.assign({}, state.data, current.data || {});
+        state.meta = current.meta || null;
         state.proof = await fetchJson("/api/operational-proof");
+        if (!state.meta && state.proof && state.proof.data_summary) {
+          state.meta = state.proof.data_summary;
+        }
       } catch (error) {
         state.error = error.message;
       } finally {
@@ -328,6 +343,7 @@ const html = `<!doctype html>
         body: JSON.stringify(Object.assign({ action: action }, payload))
       });
       state.data = Object.assign({}, state.data, body.data || {});
+      state.meta = body.meta || state.meta;
       render();
     }
     function statusBadge() {
@@ -389,10 +405,10 @@ const html = `<!doctype html>
       }).join("");
     }
     function shellIntro() {
-      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page no longer ships fake vendor records. It reads live Render/FastAPI/Postgres records through the deployed TRUSTPASS API. Writes require an authorized TRUSTPASS admin context.</p>' + statusBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
+      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page reads Render/FastAPI/Postgres records through the deployed TRUSTPASS API. The connected API reports whether visible organizations are synthetic seed/QA/proof records or unknown data.</p>' + statusBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Data classification</strong><br>' + escapeHtml(dataSummaryLabel("data_classification", "not reported")) + '</p><p><strong>Customer data assessment</strong><br>' + escapeHtml(dataSummaryLabel("customer_data_assessment", "not reported")) + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
     }
     function statusPage() {
-      return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section><section class="panel pad"><h2>Operational Proof</h2><p>Fetched from /api/operational-proof on the connected Render API.</p><pre>' + escapeHtml(JSON.stringify(state.proof || {}, null, 2)) + '</pre></section></main>';
+      return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section><section class="grid-2"><div class="panel pad"><h2>Data Summary</h2><pre>' + escapeHtml(JSON.stringify(dataSummary() || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Operational Proof</h2><p>Fetched from /api/operational-proof on the connected Render API.</p><pre>' + escapeHtml(JSON.stringify(state.proof || {}, null, 2)) + '</pre></div></section></main>';
     }
     function vendorsPage() {
       return '<main><div class="eyebrow">Live records</div><h1>Vendors</h1><p>Rows below come from the connected live API only.</p><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Vendor Trust Profiles</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Location</th><th>Trust</th><th>Status</th></tr></thead><tbody>' + vendorRows() + '</tbody></table></div></div><form id="vendor-form" class="panel pad"><h2>Create Vendor</h2><p>Create a real record in the connected live API. Writes require admin access.</p><div class="form-grid"><label>Name<input name="name" required /></label><label>Category<input name="category" /></label><label>Location<input name="location" /></label><label>Email<input name="contact_email" type="email" /></label><div class="span-2 actions"><button class="button" ' + writeDisabled() + '>Create live vendor</button><a class="button secondary" href="#/connect">Admin access</a></div></div></form></section></main>';

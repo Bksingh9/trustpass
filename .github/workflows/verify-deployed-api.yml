@@ -57,6 +57,7 @@ jobs:
     env:
       TRUSTPASS_API_BASE_URL: ${{ needs.verify-gate.outputs.api_base_url }}
       TRUSTPASS_API_PROOF_PATH: deployed-api-proof.json
+      TRUSTPASS_SEED_CONTEXT_TOKEN: ${{ secrets.TRUSTPASS_SEED_CONTEXT_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

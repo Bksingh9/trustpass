@@ -25,6 +25,8 @@ const requiredSnippets = [
   "buildConfiguredApiBaseUrl",
   "Admin Write Access",
   "Writes require an authorized TRUSTPASS admin context.",
+  "Data classification",
+  "Customer data assessment",
   "/api/health",
   "/api/readiness",
   "/api/trustpass",
@@ -51,6 +53,7 @@ const expectedLiveBaseUrl = process.env.TRUSTPASS_LIVE_BASE_URL
 const proofOutputPath = process.env.TRUSTPASS_PUBLIC_GATEWAY_PROOF_PATH || "";
 const skipLiveApiChecks = process.env.TRUSTPASS_PUBLIC_GATEWAY_SKIP_LIVE_API === "1";
 const skipWriteProof = process.env.TRUSTPASS_PUBLIC_GATEWAY_SKIP_WRITE_PROOF === "1";
+const seedContextToken = process.env.TRUSTPASS_SEED_CONTEXT_TOKEN || "";
 const attempts = Number(process.env.TRUSTPASS_PUBLIC_GATEWAY_ATTEMPTS || 30);
 const delayMs = Number(process.env.TRUSTPASS_PUBLIC_GATEWAY_DELAY_MS || 3000);
 const expectedPagesApiHealthStatus = Number(process.env.TRUSTPASS_PUBLIC_GATEWAY_API_HEALTH_STATUS || 404);
@@ -177,15 +180,19 @@ async function postTrustpassAction(action, payload, requestId) {
 
 async function resolveAdminHeaders(runId) {
   const requestId = `${runId}-seed-context`;
+  const seedContextHeaders = {
+    authorization: "Bearer seed-admin-2",
+    "x-trustpass-roles": "super_admin",
+    "x-request-id": requestId,
+  };
+  if (seedContextToken) {
+    seedContextHeaders["x-trustpass-seed-context-token"] = seedContextToken;
+  }
   const result = await fetchJson(
     urlFor(expectedLiveBaseUrl, "admin/seed-context"),
     [200],
     {
-      headers: {
-        authorization: "Bearer seed-admin-2",
-        "x-trustpass-roles": "super_admin",
-        "x-request-id": requestId,
-      },
+      headers: seedContextHeaders,
     },
   );
   assert(
@@ -292,6 +299,15 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
   assert(operationalProof.body?.postgres_connected === true, "operational proof does not see Postgres");
   assert(operationalProof.body?.d1_connected === false, "operational proof should not report D1");
   assert(operationalProof.body?.demo_data_enabled === false, "operational proof reports demo data enabled");
+  assert(
+    operationalProof.body?.data_classification === "synthetic_seed_and_qa",
+    `operational proof data classification is ${operationalProof.body?.data_classification}`,
+  );
+  assert(operationalProof.body?.contains_customer_data === false, "operational proof did not rule out customer data");
+  assert(
+    operationalProof.body?.data_summary?.organization_records?.unknown === 0,
+    "operational proof has unclassified organization records",
+  );
   assert(
     Array.isArray(operationalProof.body?.missing_tables) && operationalProof.body.missing_tables.length === 0,
     "operational proof has missing tables",
@@ -439,6 +455,11 @@ if (expectedLiveBaseUrl && !skipLiveApiChecks) {
       },
     );
     assertRequestId(finalState, requestIds.finalRead, "public write final read");
+    assert(
+      finalState.body?.meta?.data_classification === "synthetic_seed_and_qa",
+      `final read data classification is ${finalState.body?.meta?.data_classification}`,
+    );
+    assert(finalState.body?.meta?.contains_customer_data === false, "final read did not rule out customer data");
     assert(finalState.body.data.vendors.some((row) => row.id === vendor.id), "final read lost public proof vendor");
     assert(finalState.body.data.buyers.some((row) => row.id === buyer.id), "final read lost public proof buyer");
     assert(

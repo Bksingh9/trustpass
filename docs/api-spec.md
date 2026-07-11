@@ -73,6 +73,7 @@ Error:
 ## Admin
 
 - `GET /admin/review-queue`: admin review queue.
+- `GET /admin/seed-context`: deterministic seeded proof context for deployed E2E checks. In production this requires a super-admin auth context plus `x-trustpass-seed-context-token` matching `SEED_CONTEXT_TOKEN`.
 - Future: checklist manager, badge manager, verification detail, organization management, audit inspection.
 
 ## Notifications

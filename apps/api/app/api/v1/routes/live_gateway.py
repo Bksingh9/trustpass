@@ -35,6 +35,27 @@ from app.models.verification import TrustScoreSnapshot, VerificationRequest
 
 router = APIRouter()
 GATEWAY_ADMIN_ROLES = frozenset({MembershipRole.admin, MembershipRole.super_admin})
+SEEDED_SYNTHETIC_ORG_NAMES = frozenset(
+    {
+        "Atlas Freight Partners",
+        "Brightline Procurement",
+        "Clearpath Advisory",
+        "Northstar Digital Studio",
+        "TRUSTPASS Operations",
+    }
+)
+QA_RECORD_PREFIXES = (
+    "QA ",
+    "TRUSTPASS QA ",
+    "TRUSTPASS Public ",
+    "Debug ",
+)
+QA_RECORD_TOKENS = (
+    "pages-final-qa-",
+    "pages-qa-",
+    "public-gateway-",
+    "debug-",
+)
 
 
 def _response_headers(request_id: str) -> dict[str, str]:
@@ -47,6 +68,59 @@ def _response_headers(request_id: str) -> dict[str, str]:
 
 def _request_id(request: Request) -> str:
     return request.headers.get("x-request-id") or f"live-gateway-{datetime.now(timezone.utc).timestamp()}"
+
+
+def _synthetic_record_bucket(name: str) -> str:
+    if name in SEEDED_SYNTHETIC_ORG_NAMES:
+        return "seed"
+    if name.startswith(QA_RECORD_PREFIXES) or any(token in name for token in QA_RECORD_TOKENS):
+        return "qa_or_proof"
+    return "unknown"
+
+
+def _state_metadata(state: dict) -> dict:
+    organization_names = [
+        row.get("name", "")
+        for section in ("vendors", "buyers")
+        for row in state.get(section, [])
+        if isinstance(row, dict)
+    ]
+    buckets = [_synthetic_record_bucket(name) for name in organization_names]
+    seed_records = buckets.count("seed")
+    qa_or_proof_records = buckets.count("qa_or_proof")
+    unknown_records = buckets.count("unknown")
+    synthetic_records = seed_records + qa_or_proof_records
+    total_records = len(buckets)
+
+    if total_records == 0:
+        data_classification = "empty"
+        contains_customer_data = False
+        assessment = "no_records_present"
+    elif unknown_records == 0:
+        data_classification = "synthetic_seed_and_qa"
+        contains_customer_data = False
+        assessment = "no_customer_data_detected"
+    else:
+        data_classification = "mixed_or_unknown"
+        contains_customer_data = None
+        assessment = "unknown_records_present"
+
+    return {
+        "data_classification": data_classification,
+        "contains_customer_data": contains_customer_data,
+        "customer_data_assessment": assessment,
+        "organization_records": {
+            "total": total_records,
+            "synthetic": synthetic_records,
+            "seed": seed_records,
+            "qa_or_proof": qa_or_proof_records,
+            "unknown": unknown_records,
+        },
+        "synthetic_record_signals": [
+            "seeded TRUSTPASS demo organization names",
+            "QA/proof/debug naming prefixes and run-id tokens",
+        ],
+    }
 
 
 def _authorize_gateway_writer(context: UserContext, db: Session) -> User:
@@ -326,8 +400,9 @@ def _live_state(db: Session, request_id: str) -> dict:
 
 
 def _state_response(db: Session, request_id: str, status_code: int = 200) -> JSONResponse:
+    state = _live_state(db, request_id)
     return JSONResponse(
-        {"data": _live_state(db, request_id), "request_id": request_id},
+        {"data": state, "meta": _state_metadata(state), "request_id": request_id},
         status_code=status_code,
         headers=_response_headers(request_id),
     )
@@ -369,6 +444,7 @@ async def gateway_readiness(request: Request, db: Session = Depends(get_db)) -> 
 async def operational_proof(request: Request, db: Session = Depends(get_db)) -> JSONResponse:
     request_id = _request_id(request)
     state = _live_state(db, request_id)
+    metadata = _state_metadata(state)
     counts = {key: len(value) for key, value in state.items() if isinstance(value, list)}
     return JSONResponse(
         {
@@ -377,6 +453,9 @@ async def operational_proof(request: Request, db: Session = Depends(get_db)) -> 
             "postgres_connected": True,
             "d1_connected": False,
             "demo_data_enabled": False,
+            "data_classification": metadata["data_classification"],
+            "contains_customer_data": metadata["contains_customer_data"],
+            "data_summary": metadata,
             "missing_tables": [],
             "counts": counts,
             "invariants": {

@@ -29,9 +29,14 @@ For production API deployments, set:
 ```bash
 ENVIRONMENT=production
 ENABLE_DEMO_ROUTES=false
+SEED_CONTEXT_TOKEN=<shared deployed-proof secret>
 ```
 
 That keeps `/api/v1/demo/*` out of the public API while preserving the local and CI demo contract when explicitly enabled.
+`SEED_CONTEXT_TOKEN` protects the seeded proof-context helper in production. Set
+the same value as the GitHub Actions secret `TRUSTPASS_SEED_CONTEXT_TOKEN` when
+running deployed end-to-end proof workflows. Leave it unset to disable that
+helper in production.
 
 ## Database
 
@@ -80,6 +85,10 @@ public HTTPS API and a durable database. The preferred no-Cloudflare path is:
 - Bootstrap: `TRUSTPASS_SEED_ON_START=true` runs migrations plus realistic
   verification seed records so the deployed E2E can authenticate deterministic
   buyer, vendor, and admin contexts, then create fresh live records.
+- Seed context helper: `SEED_CONTEXT_TOKEN` must be set in Render and mirrored
+  as GitHub secret `TRUSTPASS_SEED_CONTEXT_TOKEN` before deployed proof
+  workflows can resolve deterministic seed IDs. This token is not a user auth
+  token; it only gates the proof helper.
 - Verification: `.github/workflows/verify-deployed-api.yml` targets
   `https://trustpass-api.onrender.com` by default. Set repository variable
   `TRUSTPASS_API_BASE_URL` only when replacing that Render URL.
@@ -99,9 +108,28 @@ The public gateway is served by GitHub Pages from the `gh-pages` branch:
 - Browser behavior: single-page app fallback via matching `index.html` and `404.html`
 
 GitHub Pages is static hosting, so it does not run the API or write to a
-database. It is not the primary no-Cloudflare live app. The no-Cloudflare live
-proof is the Render/FastAPI/PostgreSQL API verified through
-`TRUSTPASS_API_BASE_URL`.
+database. It is a static public gateway connected to the separate no-Cloudflare
+Render/FastAPI/PostgreSQL API. The same-origin Pages path
+`https://bksingh9.github.io/trustpass/api/health` should remain a static
+fallback/404. The real live API is `https://trustpass-api.onrender.com/api/v1`
+unless `TRUSTPASS_API_BASE_URL` or `TRUSTPASS_LIVE_BASE_URL` points the gateway
+to a replacement host.
+
+The currently deployed public environment is a production runtime with
+synthetic seed, QA, and proof records. It is not customer data. The live gateway
+state response includes:
+
+```json
+{
+  "meta": {
+    "data_classification": "synthetic_seed_and_qa",
+    "contains_customer_data": false
+  }
+}
+```
+
+Treat `mixed_or_unknown` as a launch review blocker for public demos unless the
+environment has intentionally been moved to real customer onboarding data.
 
 If the optional Cloudflare Worker path is used, Pages can point at the deployed
 Worker/D1 API through `TRUSTPASS_LIVE_BASE_URL`. After that connection exists,

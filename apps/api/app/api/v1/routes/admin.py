@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.core.errors import TrustPassError
 from app.core.security import UserContext, require_roles
 from app.db.session import get_db
@@ -14,6 +15,16 @@ from app.schemas.common import DataResponse
 from app.services.verification_workflow import get_admin_review_queue
 
 router = APIRouter()
+
+
+def _authorize_seed_context(settings: Settings, proof_token: str | None) -> None:
+    if settings.environment != "production":
+        return
+    if not settings.seed_context_token or proof_token != settings.seed_context_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seed context proof token required",
+        )
 
 
 @router.get("/review-queue", response_model=DataResponse)
@@ -27,8 +38,12 @@ async def review_queue(
 @router.get("/seed-context", response_model=DataResponse)
 async def seed_context(
     _: UserContext = Depends(require_roles("super_admin")),
+    x_trustpass_seed_context_token: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
     db: Session = Depends(get_db),
 ) -> DataResponse:
+    _authorize_seed_context(settings, x_trustpass_seed_context_token)
+
     organization_slugs = [
         "brightline-procurement",
         "atlas-freight-partners",
