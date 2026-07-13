@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="trustpass-build-sha" content="231b5c865b058048a37fce074212fefc2e5844c0" />
+  <meta name="trustpass-build-sha" content="e482571169d3252461ef539eb7c689c69235f277" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <title>TRUSTPASS</title>
   <style>
@@ -479,7 +479,158 @@
       if (!hasAuthContext()) {
         state.workspace.error = "Sign in or create an account to open your workspace.";
         render();
-      …4486 tokens truncated…div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page reads Render/FastAPI/Postgres records through the deployed TRUSTPASS API. The connected API reports whether visible organizations are synthetic seed/QA/proof records or unknown data.</p>' + statusBadge() + authBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Data classification</strong><br>' + escapeHtml(dataSummaryLabel("data_classification", "not reported")) + '</p><p><strong>Customer data assessment</strong><br>' + escapeHtml(dataSummaryLabel("customer_data_assessment", "not reported")) + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
+        return;
+      }
+      state.workspace.loading = true;
+      state.workspace.error = "";
+      render();
+      try {
+        const headers = authHeaders();
+        const me = await fetchJson("/auth/me", { headers: headers });
+        const current = me.data || {};
+        state.auth.userId = current.user_id || state.auth.userId;
+        state.auth.organizationId = current.organization_id || state.auth.organizationId;
+        state.auth.role = Array.isArray(current.roles) ? current.roles.join(",") : String(current.roles || state.auth.role || "");
+        state.workspace.role = workspaceRole();
+        const memberships = await fetchJson("/orgs/memberships", { headers: authHeaders() });
+        state.workspace.memberships = (memberships.data && memberships.data.memberships) || [];
+        const [plans, subscription, notifications] = await Promise.all([
+          fetchJson("/billing/plans", { headers: authHeaders() }),
+          fetchJson("/billing/subscription", { headers: authHeaders() }),
+          fetchJson("/notifications/", { headers: authHeaders() })
+        ]);
+        state.workspace.plans = (plans.data && plans.data.plans) || [];
+        state.workspace.subscription = subscription.data && subscription.data.subscription;
+        state.workspace.notifications = (notifications.data && notifications.data.notifications) || [];
+        if (state.workspace.role === "vendor") {
+          const [dashboard, documents, types] = await Promise.all([
+            fetchJson("/vendors/dashboard", { headers: authHeaders() }),
+            fetchJson("/documents/", { headers: authHeaders() }),
+            fetchJson("/documents/types", { headers: authHeaders() })
+          ]);
+          state.workspace.dashboard = dashboard.data || null;
+          state.workspace.documents = (documents.data && documents.data.documents) || [];
+          state.workspace.documentTypes = (types.data && types.data.document_types) || [];
+        }
+        if (state.workspace.role === "buyer") {
+          const [vendors, shortlists] = await Promise.all([
+            fetchJson("/buyers/search", { headers: authHeaders() }),
+            fetchJson("/buyers/shortlists", { headers: authHeaders() })
+          ]);
+          state.workspace.vendors = (vendors.data && vendors.data.vendors) || [];
+          state.workspace.shortlists = (shortlists.data && shortlists.data.shortlists) || [];
+        }
+        localStorage.setItem(authStorageKey, JSON.stringify(state.auth));
+      } catch (error) {
+        workspaceError(error);
+      } finally {
+        state.workspace.loading = false;
+        render();
+      }
+    }
+    async function runWorkspaceTask(task) {
+      try {
+        state.workspace.error = "";
+        await task();
+      } catch (error) {
+        workspaceError(error);
+        render();
+      }
+    }
+    function workspaceNotice() {
+      if (state.workspace.loading) return '<span class="api-pill">Loading workspace</span>';
+      if (state.workspace.error) return '<span class="api-pill error">' + escapeHtml(state.workspace.error) + '</span>';
+      return '<span class="api-pill connected">Workspace connected</span>';
+    }
+    function workspaceRows(rows, emptyText, renderRow, columns) {
+      return rows.length ? rows.map(renderRow).join("") : '<tr><td colspan="' + escapeHtml(columns || 1) + '"><div class="empty">' + escapeHtml(emptyText) + '</div></td></tr>';
+    }
+    function workspaceNotificationRows() {
+      return workspaceRows(state.workspace.notifications, "No notifications for this workspace.", function (notification) {
+        const action = notification.read_at ? "" : '<button class="button secondary compact" data-workspace-action="read-notification" data-notification-id="' + escapeHtml(notification.id) + '">Mark read</button>';
+        return '<tr><td><strong>' + escapeHtml(notification.subject || "Notification") + '</strong><br><span style="color: var(--muted)">' + escapeHtml(notification.body || "") + '</span></td><td>' + escapeHtml(human(notification.status)) + '</td><td>' + action + '</td></tr>';
+      }, 3);
+    }
+    function vendorDocumentRows() {
+      return workspaceRows(state.workspace.documents, "Upload your first compliance document.", function (document) {
+        return '<tr><td><strong>' + escapeHtml(document.document_type && document.document_type.name || document.file_name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(document.file_name) + '</span></td><td>' + escapeHtml(human(document.status)) + '</td><td>' + escapeHtml(document.expires_at || "No expiry") + '</td></tr>';
+      }, 3);
+    }
+    function buyerVendorRows() {
+      return workspaceRows(state.workspace.vendors, "No public vendors match the current search.", function (vendor) {
+        return '<tr><td><strong>' + escapeHtml(vendor.name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.location || "Location not listed") + '</span></td><td>' + escapeHtml(vendor.trust_score) + ' / 100</td><td>' + escapeHtml(human(vendor.trust_level)) + '</td><td><button class="button secondary compact" data-workspace-action="shortlist" data-vendor-id="' + escapeHtml(vendor.organization_id) + '">Shortlist</button><button class="button secondary compact" data-workspace-action="request" data-vendor-id="' + escapeHtml(vendor.organization_id) + '">Request info</button></td></tr>';
+      }, 4);
+    }
+    function billingWorkspaceForm() {
+      const plans = state.workspace.plans.length ? state.workspace.plans.map(function (plan) { return '<option value="' + escapeHtml(plan.code) + '">' + escapeHtml(plan.name) + ' - $' + escapeHtml((plan.amount_cents / 100).toFixed(2)) + '</option>'; }).join("") : '<option value="">No billing plans available</option>';
+      return '<form id="billing-form" class="panel pad"><h2>Workspace billing</h2><p>Checkout records a subscription and payment intent for the active organization.</p><div class="form-grid"><label class="span-2">Plan<select name="plan_code" required>' + plans + '</select></label><div class="span-2 actions"><button class="button">Create checkout</button></div></div><p>' + escapeHtml(state.workspace.subscription ? human(state.workspace.subscription.status) + " - " + state.workspace.subscription.plan_name : "No active subscription") + '</p></form>';
+    }
+    function vendorWorkspacePage() {
+      const dashboard = state.workspace.dashboard || {};
+      const profile = dashboard.profile || {};
+      const verification = dashboard.verification || {};
+      const documentTypes = state.workspace.documentTypes.length ? state.workspace.documentTypes.map(function (item) { return '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.name) + '</option>'; }).join("") : '<option value="">No document types available</option>';
+      return '<main><div class="eyebrow">Vendor workspace</div><h1>' + escapeHtml((dashboard.organization && dashboard.organization.name) || "Vendor workspace") + '</h1><p>Manage your public trust profile, upload evidence, and submit verification from this organization-scoped workspace.</p>' + workspaceNotice() + '<section class="panel stats"><div class="stat"><span>Trust score</span><strong>' + escapeHtml(profile.trust_score || 0) + '</strong></div><div class="stat"><span>Trust level</span><strong>' + escapeHtml(human(profile.trust_level || "unverified")) + '</strong></div><div class="stat"><span>Verification</span><strong>' + escapeHtml(human(verification.status || "draft")) + '</strong></div><div class="stat"><span>Documents</span><strong>' + escapeHtml(state.workspace.documents.length) + '</strong></div></section><section class="grid-2"><form id="vendor-profile-form" class="panel pad"><h2>Public trust profile</h2><div class="form-grid"><label class="span-2">Business summary<textarea name="business_summary" rows="5">' + escapeHtml(profile.business_summary || "") + '</textarea></label><label>Primary location<input name="primary_location" value="' + escapeHtml(profile.primary_location || "") + '" /></label><label>Regions served<input name="regions_served" value="' + escapeHtml((profile.regions_served || []).join(", ")) + '" /></label><label class="span-2"><span>Public profile enabled</span><input type="checkbox" name="public_profile_enabled" ' + (profile.public_profile_enabled ? "checked" : "") + ' /></label><div class="span-2 actions"><button class="button">Save profile</button><button class="button secondary" type="button" data-workspace-action="submit-verification">Submit for verification</button></div></div></form><form id="document-upload-form" class="panel pad"><h2>Upload evidence</h2><p>PDF, PNG, or JPEG files are stored by the API and remain private until approved.</p><div class="form-grid"><label class="span-2">Document type<select name="document_type_id" required>' + documentTypes + '</select></label><label>Issued date<input name="issued_at" type="date" /></label><label>Expiry date<input name="expires_at" type="date" /></label><label class="span-2">File<input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required /></label><div class="span-2 actions"><button class="button">Upload document</button></div></div></form></section><section class="grid-2">' + billingWorkspaceForm() + '<section class="panel pad"><h2>Organization access</h2><p>Active organization memberships are loaded from the API and applied to every customer workflow request.</p><div class="table-wrap"><table><thead><tr><th>Organization</th><th>Role</th></tr></thead><tbody>' + workspaceRows(state.workspace.memberships, "No active memberships.", function (item) { return '<tr><td>' + escapeHtml(item.organization_name) + '</td><td>' + escapeHtml(human(item.role)) + '</td></tr>'; }, 2) + '</tbody></table></div></section></section><section class="panel"><div class="panel-head"><h2>Submitted documents</h2></div><div class="table-wrap"><table><thead><tr><th>Document</th><th>Status</th><th>Expiry</th></tr></thead><tbody>' + vendorDocumentRows() + '</tbody></table></div></section><section class="panel"><div class="panel-head"><h2>Notifications</h2></div><div class="table-wrap"><table><thead><tr><th>Message</th><th>Status</th><th>Action</th></tr></thead><tbody>' + workspaceNotificationRows() + '</tbody></table></div></section></main>';
+    }
+    function buyerWorkspacePage() {
+      return '<main><div class="eyebrow">Buyer workspace</div><h1>Find trusted vendors</h1><p>Search public trust profiles, keep a shortlist, and request evidence from an explicit buyer-to-vendor workflow.</p>' + workspaceNotice() + '<section class="grid-2"><form id="buyer-search-form" class="panel pad"><h2>Search vendors</h2><div class="form-grid"><label class="span-2">Vendor or company<input name="q" placeholder="Search by organization name" /></label><label>Location<input name="location" placeholder="City, region, country" /></label><label>Trust level<select name="trust_level"><option value="">Any level</option><option value="unverified">Unverified</option><option value="emerging">Emerging</option><option value="trusted">Trusted</option><option value="verified">Verified</option></select></label><div class="span-2 actions"><button class="button">Search vendors</button></div></div></form>' + billingWorkspaceForm() + '</section><section class="panel"><div class="panel-head"><h2>Public vendor directory</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Score</th><th>Level</th><th>Actions</th></tr></thead><tbody>' + buyerVendorRows() + '</tbody></table></div></section><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Shortlist</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Status</th><th>Added</th></tr></thead><tbody>' + workspaceRows(state.workspace.shortlists, "Your shortlist is empty.", function (item) { return '<tr><td><strong>' + escapeHtml(item.vendor_name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(item.notes || "") + '</span></td><td>' + escapeHtml(human(item.status)) + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'; }, 3) + '</tbody></table></div></div><form id="buyer-request-form" class="panel pad"><h2>Request vendor information</h2><div class="form-grid"><label class="span-2">Vendor organization ID<input name="vendor_organization_id" required placeholder="Use Request info from the directory" /></label><label class="span-2">Subject<input name="subject" required value="Evidence request" /></label><label class="span-2">Message<textarea name="message" rows="4" required> Please share the evidence needed for our procurement review.</textarea></label><div class="span-2 actions"><button class="button">Send request</button></div></div></form></section><section class="panel"><div class="panel-head"><h2>Notifications</h2></div><div class="table-wrap"><table><thead><tr><th>Message</th><th>Status</th><th>Action</th></tr></thead><tbody>' + workspaceNotificationRows() + '</tbody></table></div></section></main>';
+    }
+    function workspacePage() {
+      if (!hasAuthContext()) return '<main><div class="eyebrow">Authenticated workflows</div><h1>Your workspace</h1><p>Sign in or create a customer account to access organization-scoped workflows.</p>' + workspaceNotice() + '<div class="actions"><a class="button" href="#/connect">Open account connection</a></div></main>';
+      if (workspaceRole() === "vendor") return vendorWorkspacePage();
+      if (workspaceRole() === "buyer") return buyerWorkspacePage();
+      return '<main><div class="eyebrow">Authenticated workflows</div><h1>Workspace access</h1><p>Your current role is ' + escapeHtml(state.auth.role || "unknown") + '. Admin review tools remain on the Connect and Requests pages.</p>' + workspaceNotice() + '</main>';
+    }
+    function writeDisabled() {
+      return state.apiBaseUrl && hasAdminContext() ? "" : "disabled";
+    }
+    function emptyRow(columns, text) {
+      return '<tr><td colspan="' + columns + '"><div class="empty">' + escapeHtml(text) + '</div></td></tr>';
+    }
+    function vendorRows() {
+      if (!state.data.vendors.length) return emptyRow(5, state.apiBaseUrl ? "No live vendors yet." : "Connect a live API to view vendors.");
+      return state.data.vendors.map(function (vendor) {
+        return '<tr><td><strong>' + escapeHtml(vendor.name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.contact_email || "No contact email") + '</span></td><td>' + escapeHtml(vendor.category || "Uncategorized") + '</td><td>' + escapeHtml(vendor.location || "") + '</td><td><strong>' + escapeHtml(vendor.trust_score || 0) + '</strong></td><td><span class="badge">' + escapeHtml(human(vendor.verification_status || "draft")) + '</span></td></tr>';
+      }).join("");
+    }
+    function requestRows() {
+      if (!state.data.buyer_requests.length) return emptyRow(4, state.apiBaseUrl ? "No live buyer requests yet." : "Connect a live API to view requests.");
+      return state.data.buyer_requests.map(function (request) {
+        return '<tr><td><strong>' + escapeHtml(request.subject) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(request.message || "") + '</span></td><td>' + escapeHtml(request.buyer_name) + '</td><td>' + escapeHtml(request.vendor_name) + '</td><td><span class="badge">' + escapeHtml(human(request.status)) + '</span></td></tr>';
+      }).join("");
+    }
+    function logRows() {
+      if (!state.data.request_logs.length) return emptyRow(4, state.apiBaseUrl ? "No live request logs yet." : "Connect a live API to view logs.");
+      return state.data.request_logs.slice(0, 25).map(function (log) {
+        return '<tr><td><strong>' + escapeHtml(log.method + " " + log.path) + '</strong></td><td>' + escapeHtml(log.status) + '</td><td>' + escapeHtml(log.request_id) + '</td><td>' + escapeHtml(log.created_at) + '</td></tr>';
+      }).join("");
+    }
+    function auditRows() {
+      if (!state.data.audit_events.length) return emptyRow(4, state.apiBaseUrl ? "No live audit events yet." : "Connect a live API to view audit events.");
+      return state.data.audit_events.slice(0, 25).map(function (event) {
+        return '<tr><td><strong>' + escapeHtml(human(event.action)) + '</strong></td><td>' + escapeHtml(event.entity_type) + '</td><td>' + escapeHtml(event.request_id || "") + '</td><td>' + escapeHtml(event.summary) + '</td></tr>';
+      }).join("");
+    }
+    function scoreRows() {
+      if (!state.data.trust_score_snapshots.length) return emptyRow(4, state.apiBaseUrl ? "No live score history yet." : "Connect a live API to view score history.");
+      return state.data.trust_score_snapshots.slice(0, 25).map(function (snapshot) {
+        return '<tr><td><strong>' + escapeHtml(snapshot.vendor_name) + '</strong></td><td>' + escapeHtml(snapshot.score) + '</td><td>' + escapeHtml(human(snapshot.status)) + '</td><td>' + escapeHtml(snapshot.buyer_safe_summary || snapshot.reason || "") + '</td></tr>';
+      }).join("");
+    }
+    function notificationRows() {
+      if (!state.data.notifications.length) return emptyRow(4, state.apiBaseUrl ? "No live notifications yet." : "Connect a live API to view notifications.");
+      return state.data.notifications.slice(0, 25).map(function (notification) {
+        return '<tr><td><strong>' + escapeHtml(notification.title) + '</strong></td><td>' + escapeHtml(notification.organization_name || "") + '</td><td>' + escapeHtml(notification.request_id || "") + '</td><td>' + escapeHtml(notification.body || "") + '</td></tr>';
+      }).join("");
+    }
+    function selectOptions(rows, valueKey, labelKey, emptyLabel) {
+      if (!rows.length) return '<option value="">' + escapeHtml(emptyLabel) + '</option>';
+      return '<option value="">Select a live record</option>' + rows.map(function (row) {
+        return '<option value="' + escapeHtml(row[valueKey]) + '">' + escapeHtml(row[labelKey] || row[valueKey]) + '</option>';
+      }).join("");
+    }
+    function shellIntro() {
+      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page reads Render/FastAPI/Postgres records through the deployed TRUSTPASS API. The connected API reports whether visible organizations are synthetic seed/QA/proof records or unknown data.</p>' + statusBadge() + authBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Data classification</strong><br>' + escapeHtml(dataSummaryLabel("data_classification", "not reported")) + '</p><p><strong>Customer data assessment</strong><br>' + escapeHtml(dataSummaryLabel("customer_data_assessment", "not reported")) + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
     }
     function statusPage() {
       return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section><section class="grid-2"><div class="panel pad"><h2>Data Summary</h2><pre>' + escapeHtml(JSON.stringify(dataSummary() || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Operational Proof</h2><p>Fetched from /api/operational-proof on the connected Render API.</p><pre>' + escapeHtml(JSON.stringify(state.proof || {}, null, 2)) + '</pre></div></section></main>';
