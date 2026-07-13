@@ -564,6 +564,7 @@ const html = `<!doctype html>
     function workspaceNotice() {
       if (state.workspace.loading) return '<span class="api-pill">Loading workspace</span>';
       if (state.workspace.error) return '<span class="api-pill error">' + escapeHtml(state.workspace.error) + '</span>';
+      if (!hasAuthContext()) return '<span class="api-pill">Sign in required</span>';
       return '<span class="api-pill connected">Workspace connected</span>';
     }
     function workspaceRows(rows, emptyText, renderRow, columns) {
@@ -863,7 +864,7 @@ const html = `<!doctype html>
         await postTrustpass("add_document", form);
         event.target.reset();
       }
-      if (event.target.id === "buyer-request-form") {
+      if (event.target.id === "buyer-request-form" && currentRoute().path !== "/workspace") {
         event.preventDefault();
         const form = Object.fromEntries(new FormData(event.target).entries());
         await postTrustpass("create_buyer_request", form);
@@ -876,9 +877,13 @@ const html = `<!doctype html>
         event.target.reset();
       }
     });
-    addEventListener("hashchange", render);
+    addEventListener("hashchange", function () {
+      render();
+      if (currentRoute().path === "/workspace") refreshWorkspace();
+    });
     render();
     refreshLiveData();
+    if (currentRoute().path === "/workspace") refreshWorkspace();
   </script>
 </body>
 </html>`;

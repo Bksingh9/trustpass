@@ -57,7 +57,7 @@ const requiredSnippets = [
   "Audit Events",
   "Trust Score History",
   "Notifications",
-  "addEventListener(\"hashchange\", render)",
+  "addEventListener(\"hashchange\", function ()",
 ];
 
 const forbiddenSnippets = [
