@@ -8,7 +8,7 @@ TRUSTPASS is a B2B vendor trust, verification, and onboarding platform. It helps
 
 - Public site: `https://bksingh9.github.io/trustpass/`
 - Live API: `https://trustpass-api.onrender.com/api/v1`
-- Current live data boundary: the deployed API uses a real production runtime and PostgreSQL database, but the visible organizations are synthetic seed, QA, and proof records. `GET /api/v1/api/trustpass` returns `meta.data_classification`; the expected public demo value is `synthetic_seed_and_qa` with `contains_customer_data: false`.
+- Current live data boundary: production is configured for real Supabase users and PostgreSQL-backed customer records. Seed and synthetic proof data are disabled in the production deployment; until real credentials are configured, the API should report an empty tenant dataset rather than fabricate records.
 - GitHub Pages is static hosting. The same-origin Pages URL `https://bksingh9.github.io/trustpass/api/health` should remain a static fallback/404; live API calls go to the separate Render/FastAPI host.
 
 ## Open Source and Security
@@ -18,8 +18,7 @@ TRUSTPASS is a B2B vendor trust, verification, and onboarding platform. It helps
 - Community conduct: see `CODE_OF_CONDUCT.md`.
 - Contribution workflow: see `CONTRIBUTING.md`.
 - Public launch checks should include tests, CodeQL code scanning, OpenSSF Scorecard, the deployed API proof, the public gateway proof, CodeRabbit review when authenticated, and security hardening review for auth, tenancy, audit, and data-classification boundaries.
-- The optional `/admin/seed-context` helper requires `SEED_CONTEXT_TOKEN` on the API host and matching GitHub secret `TRUSTPASS_SEED_CONTEXT_TOKEN`; leaving it unset disables the helper in production. The deployed E2E proof computes deterministic seed IDs locally and does not require this helper.
-- Auth boundary: `AUTH_MODE=auto` uses development headers locally and Supabase JWT verification in production. The public synthetic proof Render service explicitly sets `AUTH_MODE=development_headers` together with `ALLOW_SYNTHETIC_PROOF_DATA=true`, `TRUSTPASS_SEED_ON_START=true`, and a `SEED_CONTEXT_TOKEN`; production customer data must use `AUTH_MODE=supabase_jwt` with `SUPABASE_PROJECT_URL` and `SUPABASE_PUBLISHABLE_KEY`.
+- Auth boundary: `AUTH_MODE=auto` uses development headers locally and Supabase JWT verification in production. Production Render is explicitly configured for `AUTH_MODE=supabase_jwt` with `SUPABASE_PROJECT_URL` and `SUPABASE_PUBLISHABLE_KEY`; development headers and seed context are not production options.
 
 This repository is structured as a production-oriented MVP:
 
@@ -65,9 +64,10 @@ TRUSTPASS now has two supported operating modes:
 - Public demo: GitHub Pages serves the static TRUSTPASS workflow at `https://bksingh9.github.io/trustpass/`.
 - Full-stack proof: the FastAPI app exposes `/api/v1/demo/*` workflow endpoints that cover vendor renewal, buyer search, shortlisting, buyer requests, admin approval, contact/demo requests, audit-style events, and buyer-safe trust-profile exposure.
 - Real-data API proof: GitHub Actions runs a PostgreSQL-backed E2E check against production API routes, database persistence, request IDs, audit events, and activity logs. This path intentionally avoids `/api/v1/demo/*`.
-- Render/FastAPI live path: `render.yaml` deploys the production API with managed PostgreSQL on explicit free Render plans, disables demo routes, runs migrations, optionally bootstraps realistic verification seed records, and is verified by `.github/workflows/verify-deployed-api.yml` against `https://trustpass-api.onrender.com` unless `TRUSTPASS_API_BASE_URL` overrides it.
+- Render/FastAPI live path: `render.yaml` deploys the production API with managed PostgreSQL on explicit free Render plans, disables demo routes and seed-on-start, requires Supabase JWT auth, and expects S3-compatible object storage for durable uploads.
 - Optional Worker/D1 live proof: `apps/live` contains a D1-backed Worker app with `/api/health`, `/api/readiness`, `/api/trustpass`, `/api/operational-proof`, durable request logs, audit correlation, trust score snapshots, and notifications. The `TRUSTPASS Live App` GitHub Actions workflow runs the same write/read proof locally and only verifies a deployed Worker when `TRUSTPASS_LIVE_BASE_URL` is configured.
-- Public live gateway: the GitHub Pages build reads repository variable `TRUSTPASS_LIVE_BASE_URL`, then `TRUSTPASS_API_BASE_URL`, and otherwise defaults to `https://trustpass-api.onrender.com/api/v1`. The gateway exposes live read views and admin-protected write controls for vendors, buyers, documents, buyer requests, and verification decisions. It also displays the API-provided data classification so synthetic seed/QA/proof records are not confused with customer data.
+- Public live gateway: the GitHub Pages build reads repository variable `TRUSTPASS_LIVE_BASE_URL`, then `TRUSTPASS_API_BASE_URL`, and otherwise defaults to `https://trustpass-api.onrender.com/api/v1`. The gateway exposes public buyer-safe reads and authenticated organization-scoped workflows; it does not rely on seeded or dummy records.
+- Authenticated workspace: the Pages gateway supports Supabase sign-in/sign-up, vendor profile and evidence submission, buyer vendor search, shortlists, information requests, billing checkout, organization memberships, and notification read-state actions. These workflows require a configured Supabase project and the deployed API in `AUTH_MODE=supabase_jwt`.
 - Worker deployment: the `Deploy TRUSTPASS Live Worker` workflow runs automatically on relevant `main` pushes when Cloudflare secrets are configured. It preflights Cloudflare token/D1 access, resolves an existing D1 database by name or creates it, applies migrations, resolves the deployed Worker URL, runs the deployed E2E proof, saves the live URL as a repo variable when permitted, publishes the public gateway preconnected to that URL, and verifies the public gateway can create and re-read live records through the Worker.
 - Manual live verification: the `Verify TRUSTPASS Live URL` workflow reruns the live API and public gateway proofs against a supplied Worker URL without redeploying, including the public gateway live write proof.
 
@@ -138,3 +138,4 @@ The current GitHub Pages URL is a static public gateway, not the API host:
 Treat the live proof as complete only when the separate Render/FastAPI or
 Worker host returns health/readiness success, passes the live E2E proof, and
 reports an expected data classification.
+

@@ -4,6 +4,7 @@ from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import require_context_organization, require_context_user
@@ -18,6 +19,36 @@ from app.services.document_workflow import create_document, list_documents, revi
 from app.services.storage import get_storage_service
 
 router = APIRouter()
+
+
+@router.get("/types", response_model=DataResponse)
+async def get_document_types(
+    _: UserContext = Depends(require_roles("vendor", "admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> DataResponse:
+    document_types = db.execute(
+        select(DocumentType)
+        .where(DocumentType.is_active.is_(True))
+        .order_by(DocumentType.category.asc(), DocumentType.name.asc())
+    ).scalars().all()
+    return DataResponse(
+        data={
+            "document_types": [
+                {
+                    "id": str(item.id),
+                    "code": item.code,
+                    "name": item.name,
+                    "description": item.description,
+                    "category": item.category,
+                    "is_required": item.is_required,
+                    "requires_expiry_date": item.requires_expiry_date,
+                    "allowed_mime_types": item.allowed_mime_types,
+                    "max_file_size_mb": item.max_file_size_mb,
+                }
+                for item in document_types
+            ]
+        }
+    )
 
 
 @router.get("/", response_model=DataResponse)
@@ -134,3 +165,4 @@ async def review_document_route(
     actor_user_id = require_context_user(context)
     document = review_document(db, document_id, actor_user_id, payload)
     return DataResponse(data={"id": str(document.id), "status": document.status.value})
+

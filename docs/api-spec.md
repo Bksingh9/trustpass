@@ -67,6 +67,7 @@ Error:
 ## Documents
 
 - `GET /documents`: list document metadata for the active organization.
+- `GET /documents/types`: list active document types and upload constraints for the vendor workspace.
 - `POST /documents`: register uploaded document metadata after storage upload.
 - `POST /documents/upload`: validate and store a multipart document, persist checksum and storage metadata, and create the document record.
 - `GET /documents/{document_id}/download`: return a tenant-checked signed object URL.
@@ -103,3 +104,4 @@ Error:
 
 - `GET /metrics/overview`: admin metrics summary.
 - Future: review SLA, vendor funnel, buyer request volume, billing indicators.
+

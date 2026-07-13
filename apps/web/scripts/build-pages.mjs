@@ -140,6 +140,7 @@ const html = `<!doctype html>
       cursor: pointer;
     }
     .button.secondary { background: white; color: var(--ink); border-color: var(--border); }
+    .button.compact { min-height: 32px; padding: 0 9px; margin: 2px 4px 2px 0; font-size: 12px; }
     .button:disabled { opacity: 0.55; cursor: not-allowed; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .span-2 { grid-column: 1 / -1; }
@@ -201,6 +202,7 @@ const html = `<!doctype html>
       <a href="#/">Status</a>
       <a href="#/vendors">Vendors</a>
       <a href="#/requests">Requests</a>
+      <a href="#/workspace">Workspace</a>
       <a href="#/logs">Logs</a>
       <a href="#/connect">Connect</a>
     </nav>
@@ -255,6 +257,20 @@ const html = `<!doctype html>
         notifications: [],
         audit_events: [],
         request_logs: []
+      },
+      workspace: {
+        loading: false,
+        error: "",
+        role: "",
+        dashboard: null,
+        documents: [],
+        documentTypes: [],
+        vendors: [],
+        shortlists: [],
+        plans: [],
+        subscription: null,
+        notifications: [],
+        memberships: []
       },
       meta: null,
       loading: false,
@@ -319,6 +335,19 @@ const html = `<!doctype html>
       if (!response.ok) {
         throw new Error(body.error || path + " returned " + response.status);
       }
+      return body;
+    }
+    async function fetchUpload(path, formData) {
+      if (!state.apiBaseUrl) throw new Error("Connect a live API URL first.");
+      const response = await fetch(endpoint(path), {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData,
+        cache: "no-store"
+      });
+      const body = await response.json().catch(function () { return {}; });
+      state.lastRequestId = response.headers.get("x-request-id") || body.request_id || "";
+      if (!response.ok) throw new Error(body.error || path + " returned " + response.status);
       return body;
     }
     function totals() {
@@ -438,6 +467,8 @@ const html = `<!doctype html>
       state.error = "";
       render();
       await refreshLiveData();
+      location.hash = "#/workspace";
+      await refreshWorkspace();
     }
     function signOut() {
       localStorage.removeItem(authStorageKey);
@@ -461,56 +492,18 @@ const html = `<!doctype html>
       if (hasAuthContext()) return '<span class="api-pill connected">Signed in as ' + escapeHtml(state.auth.email || state.auth.role || "authenticated user") + '</span>';
       return '<span class="api-pill">No customer account connected</span>';
     }
-    function writeDisabled() {
-      return state.apiBaseUrl && hasAdminContext() ? "" : "disabled";
+    function workspaceRole() {
+      const roles = String(state.auth.role || "").split(",").map(function (role) { return role.trim(); });
+      return roles.includes("vendor") ? "vendor" : roles.includes("buyer") ? "buyer" : roles[0] || "";
     }
-    function emptyRow(columns, text) {
-      return '<tr><td colspan="' + columns + '"><div class="empty">' + escapeHtml(text) + '</div></td></tr>';
+    function workspaceError(error) {
+      state.workspace.error = error && error.message ? error.message : String(error || "Workspace request failed.");
     }
-    function vendorRows() {
-      if (!state.data.vendors.length) return emptyRow(5, state.apiBaseUrl ? "No live vendors yet." : "Connect a live API to view vendors.");
-      return state.data.vendors.map(function (vendor) {
-        return '<tr><td><strong>' + escapeHtml(vendor.name) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(vendor.contact_email || "No contact email") + '</span></td><td>' + escapeHtml(vendor.category || "Uncategorized") + '</td><td>' + escapeHtml(vendor.location || "") + '</td><td><strong>' + escapeHtml(vendor.trust_score || 0) + '</strong></td><td><span class="badge">' + escapeHtml(human(vendor.verification_status || "draft")) + '</span></td></tr>';
-      }).join("");
-    }
-    function requestRows() {
-      if (!state.data.buyer_requests.length) return emptyRow(4, state.apiBaseUrl ? "No live buyer requests yet." : "Connect a live API to view requests.");
-      return state.data.buyer_requests.map(function (request) {
-        return '<tr><td><strong>' + escapeHtml(request.subject) + '</strong><br><span style="color: var(--muted)">' + escapeHtml(request.message || "") + '</span></td><td>' + escapeHtml(request.buyer_name) + '</td><td>' + escapeHtml(request.vendor_name) + '</td><td><span class="badge">' + escapeHtml(human(request.status)) + '</span></td></tr>';
-      }).join("");
-    }
-    function logRows() {
-      if (!state.data.request_logs.length) return emptyRow(4, state.apiBaseUrl ? "No live request logs yet." : "Connect a live API to view logs.");
-      return state.data.request_logs.slice(0, 25).map(function (log) {
-        return '<tr><td><strong>' + escapeHtml(log.method + " " + log.path) + '</strong></td><td>' + escapeHtml(log.status) + '</td><td>' + escapeHtml(log.request_id) + '</td><td>' + escapeHtml(log.created_at) + '</td></tr>';
-      }).join("");
-    }
-    function auditRows() {
-      if (!state.data.audit_events.length) return emptyRow(4, state.apiBaseUrl ? "No live audit events yet." : "Connect a live API to view audit events.");
-      return state.data.audit_events.slice(0, 25).map(function (event) {
-        return '<tr><td><strong>' + escapeHtml(human(event.action)) + '</strong></td><td>' + escapeHtml(event.entity_type) + '</td><td>' + escapeHtml(event.request_id || "") + '</td><td>' + escapeHtml(event.summary) + '</td></tr>';
-      }).join("");
-    }
-    function scoreRows() {
-      if (!state.data.trust_score_snapshots.length) return emptyRow(4, state.apiBaseUrl ? "No live score history yet." : "Connect a live API to view score history.");
-      return state.data.trust_score_snapshots.slice(0, 25).map(function (snapshot) {
-        return '<tr><td><strong>' + escapeHtml(snapshot.vendor_name) + '</strong></td><td>' + escapeHtml(snapshot.score) + '</td><td>' + escapeHtml(human(snapshot.status)) + '</td><td>' + escapeHtml(snapshot.buyer_safe_summary || snapshot.reason || "") + '</td></tr>';
-      }).join("");
-    }
-    function notificationRows() {
-      if (!state.data.notifications.length) return emptyRow(4, state.apiBaseUrl ? "No live notifications yet." : "Connect a live API to view notifications.");
-      return state.data.notifications.slice(0, 25).map(function (notification) {
-        return '<tr><td><strong>' + escapeHtml(notification.title) + '</strong></td><td>' + escapeHtml(notification.organization_name || "") + '</td><td>' + escapeHtml(notification.request_id || "") + '</td><td>' + escapeHtml(notification.body || "") + '</td></tr>';
-      }).join("");
-    }
-    function selectOptions(rows, valueKey, labelKey, emptyLabel) {
-      if (!rows.length) return '<option value="">' + escapeHtml(emptyLabel) + '</option>';
-      return '<option value="">Select a live record</option>' + rows.map(function (row) {
-        return '<option value="' + escapeHtml(row[valueKey]) + '">' + escapeHtml(row[labelKey] || row[valueKey]) + '</option>';
-      }).join("");
-    }
-    function shellIntro() {
-      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page reads Render/FastAPI/Postgres records through the deployed TRUSTPASS API. The connected API reports whether visible organizations are synthetic seed/QA/proof records or unknown data.</p>' + statusBadge() + authBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Data classification</strong><br>' + escapeHtml(dataSummaryLabel("data_classification", "not reported")) + '</p><p><strong>Customer data assessment</strong><br>' + escapeHtml(dataSummaryLabel("customer_data_assessment", "not reported")) + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
+    async function refreshWorkspace() {
+      if (!hasAuthContext()) {
+        state.workspace.error = "Sign in or create an account to open your workspace.";
+        render();
+      …4486 tokens truncated…div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page reads Render/FastAPI/Postgres records through the deployed TRUSTPASS API. The connected API reports whether visible organizations are synthetic seed/QA/proof records or unknown data.</p>' + statusBadge() + authBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Data classification</strong><br>' + escapeHtml(dataSummaryLabel("data_classification", "not reported")) + '</p><p><strong>Customer data assessment</strong><br>' + escapeHtml(dataSummaryLabel("customer_data_assessment", "not reported")) + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
     }
     function statusPage() {
       return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section><section class="grid-2"><div class="panel pad"><h2>Data Summary</h2><pre>' + escapeHtml(JSON.stringify(dataSummary() || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Operational Proof</h2><p>Fetched from /api/operational-proof on the connected Render API.</p><pre>' + escapeHtml(JSON.stringify(state.proof || {}, null, 2)) + '</pre></div></section></main>';
@@ -534,6 +527,7 @@ const html = `<!doctype html>
       "/": statusPage,
       "/vendors": vendorsPage,
       "/requests": requestsPage,
+      "/workspace": workspacePage,
       "/logs": logsPage,
       "/connect": connectPage
     };
@@ -554,12 +548,47 @@ const html = `<!doctype html>
     document.addEventListener("click", async function (event) {
       const button = event.target.closest("[data-action]");
       const authButton = event.target.closest("[data-auth-action]");
+      const workspaceButton = event.target.closest("[data-workspace-action]");
       if (authButton) {
         try {
           await authenticate(authButton.getAttribute("data-auth-action"), document.getElementById("auth-form"));
         } catch (error) {
           state.error = error.message;
           render();
+        }
+        return;
+      }
+      if (workspaceButton) {
+        const action = workspaceButton.getAttribute("data-workspace-action");
+        if (action === "shortlist") {
+          await runWorkspaceTask(async function () {
+            await fetchJson("/buyers/shortlists", {
+              method: "POST",
+              headers: authHeaders(),
+              body: JSON.stringify({ vendor_organization_id: workspaceButton.getAttribute("data-vendor-id"), notes: "Added from vendor directory" })
+            });
+            await refreshWorkspace();
+          });
+        }
+        if (action === "request") {
+          const input = document.querySelector('#buyer-request-form input[name="vendor_organization_id"]');
+          if (input) {
+            input.value = workspaceButton.getAttribute("data-vendor-id") || "";
+            input.focus();
+            input.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }
+        if (action === "submit-verification") {
+          await runWorkspaceTask(async function () {
+            await fetchJson("/vendors/submit", { method: "POST", headers: authHeaders(), body: JSON.stringify({}) });
+            await refreshWorkspace();
+          });
+        }
+        if (action === "read-notification") {
+          await runWorkspaceTask(async function () {
+            await fetchJson("/notifications/" + workspaceButton.getAttribute("data-notification-id") + "/read", { method: "POST", headers: authHeaders(), body: JSON.stringify({}) });
+            await refreshWorkspace();
+          });
         }
         return;
       }
@@ -611,6 +640,60 @@ const html = `<!doctype html>
         state.error = "";
         render();
       }
+      if (event.target.id === "vendor-profile-form") {
+        event.preventDefault();
+        await runWorkspaceTask(async function () {
+          const values = Object.fromEntries(new FormData(event.target).entries());
+          await fetchJson("/vendors/profile", {
+            method: "PATCH",
+            headers: authHeaders(),
+            body: JSON.stringify({
+              business_summary: values.business_summary || null,
+              primary_location: values.primary_location || null,
+              regions_served: String(values.regions_served || "").split(",").map(function (item) { return item.trim(); }).filter(Boolean),
+              public_profile_enabled: values.public_profile_enabled === "on"
+            })
+          });
+          await refreshWorkspace();
+        });
+      }
+      if (event.target.id === "document-upload-form") {
+        event.preventDefault();
+        await runWorkspaceTask(async function () {
+          await fetchUpload("/documents/upload", new FormData(event.target));
+          event.target.reset();
+          await refreshWorkspace();
+        });
+      }
+      if (event.target.id === "buyer-search-form") {
+        event.preventDefault();
+        await runWorkspaceTask(async function () {
+          const values = Object.fromEntries(new FormData(event.target).entries());
+          const params = new URLSearchParams();
+          Object.keys(values).forEach(function (key) { if (values[key]) params.set(key, values[key]); });
+          const result = await fetchJson("/buyers/search" + (params.toString() ? "?" + params.toString() : ""), { headers: authHeaders() });
+          state.workspace.vendors = (result.data && result.data.vendors) || [];
+          render();
+        });
+      }
+      if (event.target.id === "billing-form") {
+        event.preventDefault();
+        await runWorkspaceTask(async function () {
+          const values = Object.fromEntries(new FormData(event.target).entries());
+          const result = await fetchJson("/billing/checkout", { method: "POST", headers: authHeaders(), body: JSON.stringify({ plan_code: values.plan_code }) });
+          state.workspace.error = "Checkout created: " + ((result.data && result.data.external_id) || "pending");
+          await refreshWorkspace();
+        });
+      }
+      if (event.target.id === "buyer-request-form") {
+        event.preventDefault();
+        await runWorkspaceTask(async function () {
+          const values = Object.fromEntries(new FormData(event.target).entries());
+          await fetchJson("/buyers/requests", { method: "POST", headers: authHeaders(), body: JSON.stringify(values) });
+          event.target.reset();
+          await refreshWorkspace();
+        });
+      }
       if (event.target.id === "vendor-form") {
         event.preventDefault();
         const form = Object.fromEntries(new FormData(event.target).entries());
@@ -654,3 +737,4 @@ writeFileSync(path.join(pagesRoot, "404.html"), html);
 writeFileSync(path.join(pagesRoot, "favicon.svg"), faviconSvg);
 writeFileSync(path.join(pagesRoot, ".nojekyll"), "");
 console.log("GitHub Pages build written to " + pagesRoot);
+

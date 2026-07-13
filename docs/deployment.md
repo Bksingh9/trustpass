@@ -32,18 +32,19 @@ ENABLE_DEMO_ROUTES=false
 AUTH_MODE=supabase_jwt
 SUPABASE_PROJECT_URL=https://<project-id>.supabase.co
 SUPABASE_PUBLISHABLE_KEY=<publishable key>
-SEED_CONTEXT_TOKEN=<shared deployed-proof secret>
+STORAGE_PROVIDER=s3
+S3_BUCKET=<private object-storage bucket>
+S3_REGION=<object-storage-region>
+AWS_ACCESS_KEY_ID=<object-storage-access-key>
+AWS_SECRET_ACCESS_KEY=<object-storage-secret>
 ```
 
-That keeps `/api/v1/demo/*` out of the public API while preserving the local and CI demo contract when explicitly enabled.
+That keeps `/api/v1/demo/*` out of the public API and prevents the production host from creating synthetic records.
 `AUTH_MODE=auto` resolves to `supabase_jwt` when `ENVIRONMENT=production` and
-to `development_headers` elsewhere. The public Render demo/proof service sets
-`AUTH_MODE=development_headers` explicitly because its seeded E2E workflows use
-deterministic non-customer users. Do not use development-header mode for real
-customer production.
-`SEED_CONTEXT_TOKEN` protects the optional seeded proof-context helper in
-production. Leave it unset to disable that helper. The default deployed E2E
-proof computes deterministic seed IDs locally and does not require the helper.
+to `development_headers` elsewhere. Render production explicitly sets
+`AUTH_MODE=supabase_jwt`; do not use development-header mode for real customer
+data. `TRUSTPASS_SEED_ON_START=false` means a new production database remains
+empty until a real Supabase-authenticated customer creates an organization.
 
 ## Database
 
@@ -89,30 +90,29 @@ public HTTPS API and a durable database. The preferred no-Cloudflare path is:
 - Database: Render managed PostgreSQL from `render.yaml` on the explicit `free`
   database plan.
 - Demo routes: disabled with `ENABLE_DEMO_ROUTES=false`.
-- Auth mode: the public demo/proof host uses `AUTH_MODE=development_headers` by
-  design for deterministic seed users. A real customer production host should
-  remove that override and configure `AUTH_MODE=supabase_jwt`,
-  `SUPABASE_PROJECT_URL`, and `SUPABASE_PUBLISHABLE_KEY`.
-- Bootstrap: `TRUSTPASS_SEED_ON_START=true` runs migrations plus realistic
-  verification seed records so the deployed E2E can authenticate deterministic
-  buyer, vendor, and admin contexts, then create fresh live records.
-- Seed context helper: `SEED_CONTEXT_TOKEN` is optional. When set in Render and
-  mirrored as GitHub secret `TRUSTPASS_SEED_CONTEXT_TOKEN`, it allows the
-  protected `/admin/seed-context` route to expose deterministic proof IDs. The
-  default deployed proof does not require it.
+- Auth mode: `AUTH_MODE=supabase_jwt` with real Supabase project credentials.
+- Bootstrap: `TRUSTPASS_SEED_ON_START=false`; migrations run, but no organizations,
+  users, documents, or proof records are inserted automatically.
+- Storage: `STORAGE_PROVIDER=s3` with a private bucket and credentials. Render's
+  local filesystem is not a durable customer-document store.
 - Verification: `.github/workflows/verify-deployed-api.yml` targets
   `https://trustpass-api.onrender.com` by default. Set repository variable
   `TRUSTPASS_API_BASE_URL` only when replacing that Render URL.
+- Optional authenticated verification: set the repository secret
+  `TRUSTPASS_REAL_ACCESS_TOKEN` to a real Supabase access token and the variable
+  `TRUSTPASS_REAL_ROLE` to `vendor` or `buyer`. Without it, the deployed check
+  validates the unauthenticated production contract and explicitly reports that
+  authenticated customer checks were not configured.
 - Automatic API rollout: `.github/workflows/deploy-render-api.yml` triggers a
   Render deploy hook from `RENDER_DEPLOY_HOOK_URL` and waits for the deployed
   OpenAPI contract to contain the authenticated onboarding, upload, billing,
   and notification routes. Without that repository secret, the workflow
   reports the deployment as not configured rather than claiming success.
 
-This proof uses production routes, not `/api/v1/demo/*`, and verifies
-health/readiness, buyer-safe search, shortlist persistence, buyer request
-persistence, document upload/review, verification decision, audit events,
-activity logs, and request IDs.
+The deployment contract uses production routes, not `/api/v1/demo/*`, and verifies
+health/readiness, API shape, unauthenticated rejection, CORS, and tenant/auth
+boundaries. Authenticated customer workflow checks require real Supabase test
+credentials and are intentionally not replaced with synthetic identities.
 
 ## Current Public Gateway
 
@@ -131,14 +131,14 @@ fallback/404. The real live API is `https://trustpass-api.onrender.com/api/v1`
 unless `TRUSTPASS_API_BASE_URL` or `TRUSTPASS_LIVE_BASE_URL` points the gateway
 to a replacement host.
 
-The currently deployed public environment is a production runtime with
-synthetic seed, QA, and proof records. It is not customer data. The live gateway
-state response includes:
+The production gateway should report an empty dataset until the first real
+organization is onboarded. It must never use seed or QA records as a substitute
+for customer data. The live gateway state response includes:
 
 ```json
 {
   "meta": {
-    "data_classification": "synthetic_seed_and_qa",
+    "data_classification": "empty",
     "contains_customer_data": false
   }
 }
@@ -248,3 +248,4 @@ The API demo route verifies the product loop:
 - `/api/v1/demo/health` for the no-database demo workflow contract.
 - Structured logs for API and worker.
 - Audit events for business-critical state changes.
+

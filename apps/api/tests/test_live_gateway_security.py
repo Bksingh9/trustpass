@@ -310,7 +310,7 @@ def test_live_gateway_state_metadata_marks_seed_and_qa_records_as_synthetic() ->
     }
 
 
-def test_live_gateway_state_metadata_keeps_unknown_records_unclassified() -> None:
+def test_live_gateway_state_metadata_marks_public_customer_records() -> None:
     state = {
         "vendors": [{"name": "Atlas Freight Partners"}, {"name": "Acme Real Supplier"}],
         "buyers": [{"name": "Brightline Procurement"}],
@@ -318,8 +318,8 @@ def test_live_gateway_state_metadata_keeps_unknown_records_unclassified() -> Non
 
     metadata = _state_metadata(state)
 
-    assert metadata["data_classification"] == "mixed_or_unknown"
-    assert metadata["contains_customer_data"] is None
+    assert metadata["data_classification"] == "customer_data_present"
+    assert metadata["contains_customer_data"] is True
     assert metadata["organization_records"]["unknown"] == 1
 
 
@@ -343,3 +343,4 @@ def test_seed_context_remains_available_for_local_development() -> None:
     settings = Settings(environment="local", seed_context_token=None)
 
     _authorize_seed_context(settings, None)
+

@@ -13,11 +13,29 @@ services:
       - key: ENABLE_DEMO_ROUTES
         value: "false"
       - key: AUTH_MODE
-        value: development_headers
+        value: supabase_jwt
       - key: ALLOW_SYNTHETIC_PROOF_DATA
-        value: "true"
+        value: "false"
       - key: TRUSTPASS_SEED_ON_START
-        value: "true"
+        value: "false"
+      - key: SUPABASE_PROJECT_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      - key: STORAGE_PROVIDER
+        value: s3
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
       - key: LOG_LEVEL
         value: INFO
       - key: DATABASE_URL
@@ -25,8 +43,6 @@ services:
           name: trustpass-postgres
           property: connectionString
       - key: REDIS_URL
-        sync: false
-      - key: SEED_CONTEXT_TOKEN
         sync: false
       - key: BILLING_WEBHOOK_SECRET
         sync: false
@@ -38,3 +54,4 @@ databases:
     plan: free
     databaseName: trustpass
     user: trustpass
+

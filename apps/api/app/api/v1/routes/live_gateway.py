@@ -101,9 +101,9 @@ def _state_metadata(state: dict) -> dict:
         contains_customer_data = False
         assessment = "no_customer_data_detected"
     else:
-        data_classification = "mixed_or_unknown"
-        contains_customer_data = None
-        assessment = "unknown_records_present"
+        data_classification = "customer_data_present"
+        contains_customer_data = True
+        assessment = "public_customer_records_present"
 
     return {
         "data_classification": data_classification,
@@ -399,8 +399,58 @@ def _live_state(db: Session, request_id: str) -> dict:
     }
 
 
-def _state_response(db: Session, request_id: str, status_code: int = 200) -> JSONResponse:
-    state = _live_state(db, request_id)
+def _public_state(db: Session, request_id: str) -> dict:
+    vendor_rows = db.execute(
+        select(Organization, VendorProfile)
+        .join(VendorProfile, VendorProfile.organization_id == Organization.id)
+        .where(
+            Organization.type == OrganizationType.vendor,
+            Organization.status == "active",
+            Organization.deleted_at.is_(None),
+            VendorProfile.public_profile_enabled.is_(True),
+        )
+        .order_by(desc(VendorProfile.current_trust_score), Organization.name.asc())
+        .limit(50)
+    ).all()
+    return {
+        "vendors": [
+            {
+                "id": str(org.id),
+                "name": org.name,
+                "category": org.industry or "Uncategorized",
+                "location": _location(org, profile),
+                "contact_email": "",
+                "trust_score": profile.current_trust_score,
+                "verification_status": profile.onboarding_status.value,
+            }
+            for org, profile in vendor_rows
+        ],
+        "buyers": [],
+        "documents": [],
+        "buyer_requests": [],
+        "request_logs": [
+            {
+                "method": "GET",
+                "path": "/api/trustpass",
+                "status": 200,
+                "request_id": request_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ],
+        "audit_events": [],
+        "trust_score_snapshots": [],
+        "notifications": [],
+    }
+
+
+def _state_response(
+    db: Session,
+    request_id: str,
+    status_code: int = 200,
+    *,
+    public_only: bool = True,
+) -> JSONResponse:
+    state = _public_state(db, request_id) if public_only else _live_state(db, request_id)
     return JSONResponse(
         {"data": state, "meta": _state_metadata(state), "request_id": request_id},
         status_code=status_code,
@@ -443,7 +493,7 @@ async def gateway_readiness(request: Request, db: Session = Depends(get_db)) -> 
 @router.get("/operational-proof")
 async def operational_proof(request: Request, db: Session = Depends(get_db)) -> JSONResponse:
     request_id = _request_id(request)
-    state = _live_state(db, request_id)
+    state = _public_state(db, request_id)
     metadata = _state_metadata(state)
     counts = {key: len(value) for key, value in state.items() if isinstance(value, list)}
     return JSONResponse(
@@ -713,4 +763,5 @@ async def write_trustpass(
         raise TrustPassError("Unsupported public gateway action", "unsupported_gateway_action", 400)
 
     db.commit()
-    return _state_response(db, request_id, status_code=201)
+    return _state_response(db, request_id, status_code=201, public_only=False)
+

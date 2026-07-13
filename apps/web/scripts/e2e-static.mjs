@@ -28,6 +28,16 @@ const requiredSnippets = [
   "authenticate",
   "/orgs/",
   "Create account",
+  "Your workspace",
+  "Vendor workspace",
+  "Buyer workspace",
+  "/vendors/dashboard",
+  "/documents/upload",
+  "/buyers/search",
+  "/buyers/shortlists",
+  "/buyers/requests",
+  "/billing/checkout",
+  "/notifications/",
   "Admin Write Access",
   "Writes require an authorized TRUSTPASS admin context.",
   "Data classification",
@@ -122,3 +132,4 @@ try {
 }
 
 console.log("STATIC_E2E_OK");
+

@@ -73,6 +73,7 @@ def get_vendor_dashboard(db: Session, organization_id: UUID) -> dict:
             "trust_score": profile.current_trust_score if profile else 0,
             "trust_level": profile.current_trust_level if profile else "unverified",
             "public_profile_enabled": profile.public_profile_enabled if profile else False,
+            "primary_location": profile.primary_location if profile else None,
             "regions_served": profile.regions_served if profile else [],
         },
         "verification": {
