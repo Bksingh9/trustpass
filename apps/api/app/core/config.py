@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     log_level: str = "INFO"
     enable_demo_routes: bool = True
+    allow_synthetic_proof_data: bool = False
     seed_context_token: str | None = None
 
     @field_validator("database_url")

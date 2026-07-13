@@ -48,6 +48,23 @@ def _resolve_auth_mode(settings: Settings) -> str:
     return "supabase_jwt" if settings.environment == "production" else "development_headers"
 
 
+def validate_auth_configuration(settings: Settings) -> None:
+    """Fail closed unless development headers are explicitly proof-only."""
+    if settings.environment != "production":
+        return
+    if _resolve_auth_mode(settings) != "development_headers":
+        return
+    if not settings.allow_synthetic_proof_data:
+        raise RuntimeError(
+            "AUTH_MODE=development_headers is disabled in production unless "
+            "ALLOW_SYNTHETIC_PROOF_DATA=true is explicitly configured"
+        )
+    if not settings.seed_context_token:
+        raise RuntimeError(
+            "Synthetic production proof mode requires SEED_CONTEXT_TOKEN so the seed helper is not public"
+        )
+
+
 def _development_header_context(
     *,
     token: str,

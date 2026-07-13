@@ -8,12 +8,14 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.v1.routes.admin import _authorize_seed_context
+from app.api.v1.routes.audit import _requested_organization
 from app.api.v1.routes.live_gateway import _authorize_gateway_writer, _state_metadata
 from app.core.config import Settings
 from app.core.security import (
     UserContext,
     _context_from_memberships,
     _resolve_auth_mode,
+    validate_auth_configuration,
 )
 from app.main import create_app
 from app.models.enums import MembershipRole, MembershipStatus, UserStatus
@@ -109,6 +111,46 @@ def test_auth_mode_can_explicitly_allow_development_headers_for_demo_proof() -> 
     settings = Settings(environment="production", auth_mode="development_headers")
 
     assert _resolve_auth_mode(settings) == "development_headers"
+
+
+def test_production_development_headers_require_explicit_synthetic_proof_mode() -> None:
+    with pytest.raises(RuntimeError, match="ALLOW_SYNTHETIC_PROOF_DATA"):
+        validate_auth_configuration(Settings(environment="production", auth_mode="development_headers"))
+
+
+def test_synthetic_proof_mode_requires_seed_context_token() -> None:
+    settings = Settings(
+        environment="production",
+        auth_mode="development_headers",
+        allow_synthetic_proof_data=True,
+    )
+
+    with pytest.raises(RuntimeError, match="SEED_CONTEXT_TOKEN"):
+        validate_auth_configuration(settings)
+
+
+def test_synthetic_proof_mode_is_valid_with_explicit_token() -> None:
+    settings = Settings(
+        environment="production",
+        auth_mode="development_headers",
+        allow_synthetic_proof_data=True,
+        seed_context_token="proof-token",
+    )
+
+    validate_auth_configuration(settings)
+
+
+def test_non_super_admin_cannot_query_another_organization_audit_data() -> None:
+    current_organization_id = uuid4()
+
+    with pytest.raises(HTTPException) as exc_info:
+        _requested_organization(
+            _context(roles=("admin",), organization_id=current_organization_id),
+            uuid4(),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Authenticated organization context mismatch"
 
 
 def test_live_gateway_writer_rejects_non_admin_role() -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,19 @@ from app.schemas.common import DataResponse
 router = APIRouter()
 
 
+def _requested_organization(context: UserContext, organization_id: UUID | None) -> UUID | None:
+    if "super_admin" in context.roles:
+        return organization_id
+
+    current_organization_id = require_context_organization(context)
+    if organization_id is not None and organization_id != current_organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated organization context mismatch",
+        )
+    return current_organization_id
+
+
 @router.get("/events", response_model=DataResponse)
 async def audit_events(
     organization_id: UUID | None = Query(default=None),
@@ -22,10 +35,9 @@ async def audit_events(
     db: Session = Depends(get_db),
 ) -> DataResponse:
     statement = select(AuditEvent).order_by(desc(AuditEvent.created_at)).limit(100)
-    if organization_id:
-        statement = statement.where(AuditEvent.organization_id == organization_id)
-    elif "super_admin" not in context.roles:
-        statement = statement.where(AuditEvent.organization_id == require_context_organization(context))
+    requested_organization_id = _requested_organization(context, organization_id)
+    if requested_organization_id:
+        statement = statement.where(AuditEvent.organization_id == requested_organization_id)
 
     events = db.execute(statement).scalars().all()
     return DataResponse(
@@ -54,10 +66,9 @@ async def activity_logs(
     db: Session = Depends(get_db),
 ) -> DataResponse:
     statement = select(ActivityLog).order_by(desc(ActivityLog.created_at)).limit(100)
-    if organization_id:
-        statement = statement.where(ActivityLog.organization_id == organization_id)
-    elif "super_admin" not in context.roles:
-        statement = statement.where(ActivityLog.organization_id == require_context_organization(context))
+    requested_organization_id = _requested_organization(context, organization_id)
+    if requested_organization_id:
+        statement = statement.where(ActivityLog.organization_id == requested_organization_id)
 
     logs = db.execute(statement).scalars().all()
     return DataResponse(

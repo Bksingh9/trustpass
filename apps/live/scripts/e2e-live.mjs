@@ -20,6 +20,7 @@ const baseUrl = (args.get("base-url") ?? process.env.TRUSTPASS_LIVE_BASE_URL ?? 
   "/",
 );
 const proofOutputPath = args.get("proof-out") ?? process.env.TRUSTPASS_LIVE_PROOF_PATH ?? "";
+const apiToken = process.env.TRUSTPASS_API_TOKEN?.trim() ?? "";
 const runId = `live-e2e-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random()
   .toString(36)
   .slice(2, 8)}`;
@@ -98,6 +99,7 @@ async function postAction(action, payload, requestId) {
       headers: {
         "content-type": "application/json",
         "x-request-id": requestId,
+        ...(apiToken ? { authorization: `Bearer ${apiToken}` } : {}),
       },
       body: JSON.stringify({ action, ...payload }),
     },

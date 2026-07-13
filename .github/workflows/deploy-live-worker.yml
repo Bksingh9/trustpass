@@ -53,18 +53,19 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TRUSTPASS_WORKER_API_TOKEN: ${{ secrets.TRUSTPASS_WORKER_API_TOKEN }}
     steps:
       - name: Check required secrets
         id: check
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "${CLOUDFLARE_ACCOUNT_ID}" && -n "${CLOUDFLARE_API_TOKEN}" ]]; then
+          if [[ -n "${CLOUDFLARE_ACCOUNT_ID}" && -n "${CLOUDFLARE_API_TOKEN}" && -n "${TRUSTPASS_WORKER_API_TOKEN}" ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             echo "Cloudflare deploy credentials are configured." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Cloudflare deploy credentials are missing. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN repository secrets to deploy TRUSTPASS live." >> "$GITHUB_STEP_SUMMARY"
+            echo "Cloudflare deploy credentials or TRUSTPASS_WORKER_API_TOKEN are missing. Add all three repository secrets to deploy TRUSTPASS live." >> "$GITHUB_STEP_SUMMARY"
             if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
               exit 1
             fi
@@ -81,6 +82,7 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TRUSTPASS_WORKER_API_TOKEN: ${{ secrets.TRUSTPASS_WORKER_API_TOKEN }}
       TRUSTPASS_WORKER_NAME: ${{ github.event.inputs.worker_name || vars.TRUSTPASS_WORKER_NAME || 'trustpass-live' }}
       TRUSTPASS_D1_DATABASE_NAME: ${{ github.event.inputs.d1_database_name || vars.TRUSTPASS_D1_DATABASE_NAME || 'trustpass-live' }}
       TRUSTPASS_D1_DATABASE_ID: ${{ github.event.inputs.d1_database_id || vars.TRUSTPASS_D1_DATABASE_ID || '' }}
@@ -114,6 +116,10 @@ jobs:
       - name: Prepare production Wrangler config
         run: node scripts/prepare-cloudflare-deploy.mjs
 
+      - name: Configure Worker proof token
+        shell: bash
+        run: printf '%s' "$TRUSTPASS_WORKER_API_TOKEN" | pnpm exec wrangler secret put TRUSTPASS_API_TOKEN --config dist/server/wrangler.json
+
       - name: Apply D1 migrations
         shell: bash
         run: pnpm exec wrangler d1 migrations apply "${TRUSTPASS_D1_DATABASE_NAME}" --remote --config dist/server/wrangler.json
@@ -132,6 +138,7 @@ jobs:
 
       - name: Run deployed live E2E proof
         env:
+          TRUSTPASS_API_TOKEN: ${{ secrets.TRUSTPASS_WORKER_API_TOKEN }}
           TRUSTPASS_LIVE_PROOF_PATH: live-e2e-proof.json
         run: pnpm run e2e:live
 

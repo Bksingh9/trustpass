@@ -39,11 +39,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          printf 'TRUSTPASS_PUBLIC_WRITES_ENABLED=true\nTRUSTPASS_API_TOKEN=local-e2e-token\n' > .dev.vars
           pnpm run dev -- --host localhost --port 4180 > live-dev.log 2>&1 &
           echo "$!" > live-dev.pid
 
       - name: Run live D1 E2E proof
         env:
+          TRUSTPASS_API_TOKEN: local-e2e-token
           TRUSTPASS_LIVE_PROOF_PATH: live-e2e-proof-local.json
         run: pnpm run e2e:live -- --base-url http://localhost:4180/
 
@@ -92,6 +94,7 @@ jobs:
       - name: Verify deployed live API and data path
         env:
           TRUSTPASS_LIVE_BASE_URL: ${{ vars.TRUSTPASS_LIVE_BASE_URL }}
+          TRUSTPASS_API_TOKEN: ${{ secrets.TRUSTPASS_WORKER_API_TOKEN }}
           TRUSTPASS_REQUIRE_CORS_PREFLIGHT: "1"
           TRUSTPASS_LIVE_PROOF_PATH: live-e2e-proof-deployed.json
         run: pnpm run e2e:live

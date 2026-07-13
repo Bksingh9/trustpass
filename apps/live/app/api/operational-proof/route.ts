@@ -124,13 +124,19 @@ export async function GET(request: Request) {
       await Promise.all(requiredTables.map(async (table) => [table, await countRows(db, table)])),
     ) as Record<string, number>;
 
-    const recentAuditEvents = await recentRows(db, "SELECT * FROM audit_events ORDER BY created_at DESC LIMIT 10");
-    const recentRequestLogs = await recentRows(db, "SELECT * FROM request_logs ORDER BY created_at DESC LIMIT 10");
-    const recentScoreSnapshots = await recentRows(
+    const recentAuditEvents = await recentRows<{ summary?: string; [key: string]: unknown }>(
+      db,
+      "SELECT * FROM audit_events ORDER BY created_at DESC LIMIT 10",
+    );
+    const recentRequestLogs = await recentRows<{ [key: string]: unknown }>(
+      db,
+      "SELECT * FROM request_logs ORDER BY created_at DESC LIMIT 10",
+    );
+    const recentScoreSnapshots = await recentRows<{ reason?: string; [key: string]: unknown }>(
       db,
       "SELECT trust_score_snapshots.*, organizations.name AS vendor_name FROM trust_score_snapshots LEFT JOIN organizations ON organizations.id = trust_score_snapshots.vendor_id ORDER BY trust_score_snapshots.created_at DESC LIMIT 10",
     );
-    const recentNotifications = await recentRows(
+    const recentNotifications = await recentRows<{ body?: string; [key: string]: unknown }>(
       db,
       "SELECT notifications.*, organizations.name AS organization_name FROM notifications LEFT JOIN organizations ON organizations.id = notifications.organization_id ORDER BY notifications.created_at DESC LIMIT 10",
     );
@@ -153,12 +159,12 @@ export async function GET(request: Request) {
           has_score_snapshots: counts.trust_score_snapshots > 0,
           has_notifications: counts.notifications > 0,
         },
-        recent: {
-          audit_events: recentAuditEvents,
-          request_logs: recentRequestLogs,
-          trust_score_snapshots: recentScoreSnapshots,
-          notifications: recentNotifications,
-        },
+         recent: {
+           audit_events: recentAuditEvents.map(({ summary: _summary, ...event }) => event),
+           request_logs: recentRequestLogs,
+           trust_score_snapshots: recentScoreSnapshots.map(({ reason: _reason, ...snapshot }) => snapshot),
+           notifications: recentNotifications.map(({ body: _body, ...notification }) => notification),
+         },
       },
       responseInit(requestId, missingTables.length === 0 ? 200 : 503),
     );

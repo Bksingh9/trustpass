@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -17,11 +17,16 @@ async def list_notifications(
     context: UserContext = Depends(get_user_context),
     db: Session = Depends(get_db),
 ) -> DataResponse:
+    if context.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated organization context required",
+        )
+
     statement = select(Notification).order_by(desc(Notification.created_at)).limit(50)
+    statement = statement.where(Notification.organization_id == context.organization_id)
     if context.user_id:
         statement = statement.where(Notification.user_id == context.user_id)
-    elif context.organization_id:
-        statement = statement.where(Notification.organization_id == context.organization_id)
     notifications = db.execute(statement).scalars().all()
     return DataResponse(
         data={

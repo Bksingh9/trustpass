@@ -11,10 +11,12 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
+from app.core.security import validate_auth_configuration
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    validate_auth_configuration(settings)
     configure_logging(settings.log_level)
 
     app = FastAPI(

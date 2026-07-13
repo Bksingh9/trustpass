@@ -15,6 +15,8 @@ type TrustpassD1Database = {
 
 type LiveEnv = {
   DB?: TrustpassD1Database;
+  TRUSTPASS_PUBLIC_WRITES_ENABLED?: string;
+  TRUSTPASS_API_TOKEN?: string;
 };
 
 type OrganizationRow = {
@@ -222,6 +224,27 @@ function responseInit(requestId: string, status = 200): ResponseInit {
   };
 }
 
+function mutationAuthorization(request: Request, requestId: string): Response | null {
+  const liveEnv = env as LiveEnv;
+  if (liveEnv.TRUSTPASS_PUBLIC_WRITES_ENABLED !== "true") {
+    return Response.json(
+      { error: "Public Worker writes are disabled", request_id: requestId },
+      responseInit(requestId, 503),
+    );
+  }
+
+  const configuredToken = liveEnv.TRUSTPASS_API_TOKEN?.trim();
+  const suppliedToken = request.headers.get("authorization")?.trim();
+  if (!configuredToken || suppliedToken !== `Bearer ${configuredToken}`) {
+    return Response.json(
+      { error: "Worker proof token required", request_id: requestId },
+      responseInit(requestId, 401),
+    );
+  }
+
+  return null;
+}
+
 export async function OPTIONS(request: Request) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   return new Response(null, responseInit(requestId, 204));
@@ -279,17 +302,31 @@ async function readState(db: TrustpassD1Database) {
   };
 }
 
+function publicState(state: Awaited<ReturnType<typeof readState>>) {
+  return {
+    ...state,
+    buyer_requests: state.buyer_requests.map(({ message: _message, ...request }) => request),
+    verification_decisions: state.verification_decisions.map(({ notes: _notes, ...decision }) => decision),
+    trust_score_snapshots: state.trust_score_snapshots.map(({ reason: _reason, ...snapshot }) => snapshot),
+    notifications: state.notifications.map(({ body: _body, ...notification }) => notification),
+    audit_events: state.audit_events.map(({ summary: _summary, ...event }) => event),
+  };
+}
+
 export async function GET(request: Request) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const db = getDatabase();
   await ensureSchema(db);
   await recordRequestLog(db, request, requestId, 200);
   const state = await readState(db);
-  return Response.json({ data: state, request_id: requestId }, responseInit(requestId));
+  return Response.json({ data: publicState(state), request_id: requestId }, responseInit(requestId));
 }
 
 export async function POST(request: Request) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const authorizationError = mutationAuthorization(request, requestId);
+  if (authorizationError) return authorizationError;
+
   const db = getDatabase();
   await ensureSchema(db);
 
