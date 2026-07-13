@@ -95,8 +95,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: apps/live/package-lock.json
+          cache: pnpm
+          cache-dependency-path: apps/live/pnpm-lock.yaml
+
+      - name: Enable pnpm
+        run: corepack enable
 
       - name: Preflight Cloudflare deployment access
         run: node scripts/check-cloudflare-deploy-access.mjs
@@ -105,23 +108,23 @@ jobs:
         run: node scripts/ensure-cloudflare-d1.mjs
 
       - name: Install live app dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Worker app
-        run: npm run build
+        run: pnpm run build
 
       - name: Prepare production Wrangler config
         run: node scripts/prepare-cloudflare-deploy.mjs
 
       - name: Apply D1 migrations
         shell: bash
-        run: npx wrangler d1 migrations apply "${TRUSTPASS_D1_DATABASE_NAME}" --remote --config dist/server/wrangler.json
+        run: pnpm exec wrangler d1 migrations apply "${TRUSTPASS_D1_DATABASE_NAME}" --remote --config dist/server/wrangler.json
 
       - name: Deploy Worker
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler deploy --config dist/server/wrangler.json 2>&1 | tee deploy-output.log
+          pnpm exec wrangler deploy --config dist/server/wrangler.json 2>&1 | tee deploy-output.log
 
       - name: Resolve deployed API URL
         run: node scripts/resolve-live-base-url.mjs --deploy-log deploy-output.log
@@ -132,7 +135,7 @@ jobs:
       - name: Run deployed live E2E proof
         env:
           TRUSTPASS_LIVE_PROOF_PATH: live-e2e-proof.json
-        run: npm run e2e:live
+        run: pnpm run e2e:live
 
       - name: Upload live deployment proof
         if: always()
