@@ -20,7 +20,7 @@ jobs:
       TRUSTPASS_LIVE_BASE_URL: ${{ vars.TRUSTPASS_LIVE_BASE_URL || vars.TRUSTPASS_API_BASE_URL || 'https://trustpass-api.onrender.com/api/v1' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
