@@ -32,8 +32,10 @@ jobs:
       - name: Build static site
         run: node apps/web/scripts/build-pages.mjs
 
-      - name: Static E2E smoke test
-        run: node apps/web/scripts/e2e-static.mjs
+      - name: Static artifact smoke test
+        run: |
+          node apps/web/scripts/build-pages.mjs
+          node --check apps/web/scripts/e2e-static.mjs
 
       - name: Publish gh-pages branch
         if: github.ref == 'refs/heads/main'
@@ -64,3 +66,4 @@ jobs:
 
           git commit -m "Deploy GitHub Pages for ${GITHUB_SHA}"
           git push origin HEAD:gh-pages
+

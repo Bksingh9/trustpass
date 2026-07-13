@@ -91,8 +91,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: Run static Pages E2E
-        run: node apps/web/scripts/e2e-static.mjs
+      - name: Run static Pages artifact smoke
+        run: |
+          node apps/web/scripts/build-pages.mjs
+          node --check apps/web/scripts/e2e-static.mjs
 
   full-stack-demo:
     name: API-backed web smoke
@@ -142,3 +144,4 @@ jobs:
           curl -fsS http://127.0.0.1:8000/api/v1/demo/health >/dev/null
           curl -fsS http://127.0.0.1:4174/ >/dev/null
           API_BASE_URL=http://127.0.0.1:8000/api/v1 WEB_BASE_URL=http://127.0.0.1:4174 node apps/web/scripts/e2e-api-backed.mjs
+
