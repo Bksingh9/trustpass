@@ -45,7 +45,9 @@ Error:
 ## Organizations
 
 - `GET /orgs/context`: active organization context.
-- Future: create organization, update profile, invite user, list members, change role, remove member.
+- `POST /orgs/`: create a vendor or buyer organization and its first active membership after external auth.
+- `GET /orgs/memberships`: list active organizations for the authenticated user.
+- Internal organizations cannot be created through the public onboarding route.
 
 ## Vendors
 
@@ -66,8 +68,10 @@ Error:
 
 - `GET /documents`: list document metadata for the active organization.
 - `POST /documents`: register uploaded document metadata after storage upload.
+- `POST /documents/upload`: validate and store a multipart document, persist checksum and storage metadata, and create the document record.
+- `GET /documents/{document_id}/download`: return a tenant-checked signed object URL.
 - `PATCH /documents/{document_id}/review`: admin document review decision.
-- Future: create upload, confirm upload, signed preview/download URL, and replace document.
+- Storage uses local objects for development/proof and an S3-compatible adapter when `STORAGE_PROVIDER=s3`.
 
 ## Verification
 
@@ -85,12 +89,15 @@ Error:
 ## Notifications
 
 - `GET /notifications`: current user notifications.
-- Future: mark read, mark all read, notification preferences.
+- `POST /notifications/{notification_id}/read`: mark one organization-scoped notification as read.
 
 ## Billing
 
 - `GET /billing/plans`: supported MVP plans.
-- Future: create checkout session, list subscription state, webhook handlers for Stripe and Razorpay.
+- `GET /billing/subscription`: latest subscription for the active organization.
+- `POST /billing/checkout`: persist a subscription and payment record and return an adapter checkout session.
+- `POST /billing/webhooks/{provider}`: idempotently apply a provider event, update payment/subscription status, and write an audit event. Production requires `BILLING_WEBHOOK_SECRET`.
+- The current deployed proof uses the deterministic mock adapter; Stripe/Razorpay adapters remain explicit external integration work.
 
 ## Metrics
 

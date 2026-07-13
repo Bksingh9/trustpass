@@ -36,8 +36,10 @@ class Settings(BaseSettings):
     s3_bucket: str | None = None
     s3_region: str | None = None
     s3_endpoint_url: str | None = None
+    max_upload_bytes: int = 15 * 1024 * 1024
 
     billing_provider: str = "mock"
+    billing_webhook_secret: str | None = None
     email_provider: str = "mock"
     sentry_dsn: str | None = None
     log_level: str = "INFO"

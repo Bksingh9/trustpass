@@ -210,6 +210,7 @@ const html = `<!doctype html>
     const runtimeParams = new URLSearchParams(location.search);
     const storageKey = "trustpass-live-api-base-url";
     const adminStorageKey = "trustpass-live-admin-context";
+    const authStorageKey = "trustpass-live-auth-context";
     const buildConfiguredApiBaseUrl = ${JSON.stringify(liveApiBaseUrl)};
     const configuredApiBaseUrl = (runtimeParams.get("api") || localStorage.getItem(storageKey) || buildConfiguredApiBaseUrl || "").replace(/\\/$/, "");
     if (runtimeParams.get("api")) {
@@ -225,11 +226,22 @@ const html = `<!doctype html>
         return { token: "", userId: "", organizationId: "", roles: "super_admin" };
       }
     }
+    function readAuthContext() {
+      try {
+        return Object.assign(
+          { projectUrl: "", publishableKey: "", email: "", accessToken: "", userId: "", organizationId: "", role: "" },
+          JSON.parse(localStorage.getItem(authStorageKey) || "{}")
+        );
+      } catch (_error) {
+        return { projectUrl: "", publishableKey: "", email: "", accessToken: "", userId: "", organizationId: "", role: "" };
+      }
+    }
 
     let state = {
       apiBaseUrl: configuredApiBaseUrl,
       apiDraft: configuredApiBaseUrl,
       adminContext: readAdminContext(),
+      auth: readAuthContext(),
       health: null,
       readiness: null,
       proof: null,
@@ -268,8 +280,20 @@ const html = `<!doctype html>
         state.adminContext.token &&
         state.adminContext.userId &&
         state.adminContext.organizationId &&
-        state.adminContext.roles
+        state.adminContext.roles &&
+        state.adminContext.roles.split(",").some(function (role) { return role.trim() === "admin" || role.trim() === "super_admin"; })
       );
+    }
+    function hasAuthContext() {
+      return Boolean(state.auth.accessToken);
+    }
+    function authHeaders() {
+      if (!hasAuthContext()) throw new Error("Sign in or create an account first.");
+      const headers = { authorization: "Bearer " + state.auth.accessToken };
+      if (state.auth.userId) headers["x-trustpass-user-id"] = state.auth.userId;
+      if (state.auth.organizationId) headers["x-trustpass-organization-id"] = state.auth.organizationId;
+      if (state.auth.role) headers["x-trustpass-roles"] = state.auth.role;
+      return headers;
     }
     function adminHeaders() {
       if (!hasAdminContext()) {
@@ -352,6 +376,77 @@ const html = `<!doctype html>
       state.meta = body.meta || state.meta;
       render();
     }
+    async function authenticate(mode, form) {
+      const values = Object.fromEntries(new FormData(form).entries());
+      const projectUrl = String(values.project_url || "").trim().replace(/\/$/, "");
+      const publishableKey = String(values.publishable_key || "").trim();
+      const email = String(values.email || "").trim();
+      const password = String(values.password || "");
+      if (!projectUrl || !publishableKey || !email || !password) throw new Error("Supabase project, publishable key, email, and password are required.");
+      const endpointPath = mode === "signup" ? "/auth/v1/signup" : "/auth/v1/token?grant_type=password";
+      const authResponse = await fetch(projectUrl + endpointPath, {
+        method: "POST",
+        headers: { apikey: publishableKey, "content-type": "application/json" },
+        body: JSON.stringify(mode === "signup" ? {
+          email: email,
+          password: password,
+          data: { full_name: String(values.full_name || "").trim() }
+        } : { email: email, password: password })
+      });
+      const authBody = await authResponse.json().catch(function () { return {}; });
+      if (!authResponse.ok) throw new Error(authBody.msg || authBody.error_description || authBody.error || "Supabase authentication failed.");
+      const session = authBody.session || authBody;
+      const accessToken = session.access_token;
+      const user = session.user || authBody.user || {};
+      if (!accessToken) throw new Error("Supabase requires email confirmation before this account can access TRUSTPASS.");
+      state.auth = {
+        projectUrl: projectUrl,
+        publishableKey: publishableKey,
+        email: user.email || email,
+        accessToken: accessToken,
+        userId: user.id || "",
+        organizationId: "",
+        role: ""
+      };
+      state.adminContext = { token: accessToken, userId: "", organizationId: "", roles: "" };
+      if (mode === "signup") {
+        const organizationName = String(values.organization_name || "").trim();
+        if (!organizationName) throw new Error("Organization name is required to finish signup.");
+        const organizationResponse = await fetchJson("/orgs/", {
+          method: "POST",
+          headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+          body: JSON.stringify({
+            name: organizationName,
+            type: String(values.organization_type || "vendor"),
+            email: email,
+            full_name: String(values.full_name || "").trim()
+          })
+        });
+        const created = organizationResponse.data || {};
+        state.auth.userId = created.user && created.user.id ? created.user.id : state.auth.userId;
+        state.auth.organizationId = created.organization && created.organization.id ? created.organization.id : "";
+        state.auth.role = created.role || String(values.organization_type || "vendor");
+      } else {
+        const me = await fetchJson("/auth/me", { headers: authHeaders() });
+        const current = me.data || {};
+        state.auth.userId = current.user_id || state.auth.userId;
+        state.auth.organizationId = current.organization_id || "";
+        state.auth.role = (current.roles || []).join(",");
+      }
+      localStorage.setItem(authStorageKey, JSON.stringify(state.auth));
+      localStorage.setItem(adminStorageKey, JSON.stringify(state.adminContext));
+      state.error = "";
+      render();
+      await refreshLiveData();
+    }
+    function signOut() {
+      localStorage.removeItem(authStorageKey);
+      localStorage.removeItem(adminStorageKey);
+      state.auth = readAuthContext();
+      state.adminContext = readAdminContext();
+      state.error = "";
+      render();
+    }
     function statusBadge() {
       if (!state.apiBaseUrl) return '<span class="api-pill">Live API not connected</span>';
       if (state.error) return '<span class="api-pill error">' + escapeHtml(state.error) + '</span>';
@@ -361,6 +456,10 @@ const html = `<!doctype html>
     function adminBadge() {
       if (hasAdminContext()) return '<span class="api-pill connected">Admin writes enabled</span>';
       return '<span class="api-pill">Read-only until admin access is configured</span>';
+    }
+    function authBadge() {
+      if (hasAuthContext()) return '<span class="api-pill connected">Signed in as ' + escapeHtml(state.auth.email || state.auth.role || "authenticated user") + '</span>';
+      return '<span class="api-pill">No customer account connected</span>';
     }
     function writeDisabled() {
       return state.apiBaseUrl && hasAdminContext() ? "" : "disabled";
@@ -411,7 +510,7 @@ const html = `<!doctype html>
       }).join("");
     }
     function shellIntro() {
-      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page reads Render/FastAPI/Postgres records through the deployed TRUSTPASS API. The connected API reports whether visible organizations are synthetic seed/QA/proof records or unknown data.</p>' + statusBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Data classification</strong><br>' + escapeHtml(dataSummaryLabel("data_classification", "not reported")) + '</p><p><strong>Customer data assessment</strong><br>' + escapeHtml(dataSummaryLabel("customer_data_assessment", "not reported")) + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
+      return '<section class="hero"><div><div class="eyebrow">Live trust operations</div><h1>TRUSTPASS Live Gateway</h1><p>This public page reads Render/FastAPI/Postgres records through the deployed TRUSTPASS API. The connected API reports whether visible organizations are synthetic seed/QA/proof records or unknown data.</p>' + statusBadge() + authBadge() + adminBadge() + '<div class="actions"><a class="button" href="#/connect">Connect Live API</a><button class="button secondary" data-action="refresh" ' + (state.apiBaseUrl ? "" : "disabled") + '>Refresh live data</button></div></div><div class="panel pad"><h2>Connection</h2><p><strong>API base</strong><br>' + escapeHtml(state.apiBaseUrl || "Not configured") + '</p><p><strong>Write mode</strong><br>' + (hasAdminContext() ? "Admin protected" : "Read-only") + '</p><p><strong>Data classification</strong><br>' + escapeHtml(dataSummaryLabel("data_classification", "not reported")) + '</p><p><strong>Customer data assessment</strong><br>' + escapeHtml(dataSummaryLabel("customer_data_assessment", "not reported")) + '</p><p><strong>Last request</strong><br>' + escapeHtml(state.lastRequestId || "None") + '</p></div></section>';
     }
     function statusPage() {
       return '<main>' + shellIntro() + '<section class="panel stats">' + totals().map(function (item) { return '<div class="stat"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join("") + '</section><section class="grid-2"><div class="panel pad"><h2>Health</h2><pre>' + escapeHtml(JSON.stringify(state.health || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Readiness</h2><pre>' + escapeHtml(JSON.stringify(state.readiness || {}, null, 2)) + '</pre></div></section><section class="grid-2"><div class="panel pad"><h2>Data Summary</h2><pre>' + escapeHtml(JSON.stringify(dataSummary() || {}, null, 2)) + '</pre></div><div class="panel pad"><h2>Operational Proof</h2><p>Fetched from /api/operational-proof on the connected Render API.</p><pre>' + escapeHtml(JSON.stringify(state.proof || {}, null, 2)) + '</pre></div></section></main>';
@@ -429,7 +528,7 @@ const html = `<!doctype html>
       return '<main><div class="eyebrow">Operational proof</div><h1>Logs</h1><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Request Logs</h2></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Status</th><th>ID</th><th>Time</th></tr></thead><tbody>' + logRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Audit Events</h2></div><div class="table-wrap"><table><thead><tr><th>Action</th><th>Entity</th><th>Request ID</th><th>Summary</th></tr></thead><tbody>' + auditRows() + '</tbody></table></div></div></section><section class="grid-2"><div class="panel"><div class="panel-head"><h2>Trust Score History</h2></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Score</th><th>Status</th><th>Summary</th></tr></thead><tbody>' + scoreRows() + '</tbody></table></div></div><div class="panel"><div class="panel-head"><h2>Notifications</h2></div><div class="table-wrap"><table><thead><tr><th>Title</th><th>Organization</th><th>Request ID</th><th>Body</th></tr></thead><tbody>' + notificationRows() + '</tbody></table></div></div></section></main>';
     }
     function connectPage() {
-      return '<main><div class="eyebrow">Configuration</div><h1>Connect Live API</h1><section class="grid-2"><section class="panel pad"><h2>Live API</h2><p>This page calls /api/health, /api/readiness, /api/trustpass, and /api/operational-proof from the connected host.</p><form id="api-form" class="form-grid"><label class="span-2">Live API base URL<input name="api_base_url" required value="' + escapeHtml(state.apiDraft || "") + '" placeholder="https://trustpass-api.onrender.com/api/v1" /></label><div class="span-2 actions"><button class="button">Save and test</button><button class="button secondary" type="button" data-action="clear-api">Clear</button></div></form></section><section class="panel pad"><h2>Admin Write Access</h2><p>Writes require an authorized TRUSTPASS admin context. Read-only views work without these fields.</p><form id="admin-form" class="form-grid"><label class="span-2">Bearer token<input name="token" value="' + escapeHtml(state.adminContext.token) + '" autocomplete="off" placeholder="Supabase access token or TRUSTPASS admin subject" /></label><label>User ID<input name="user_id" value="' + escapeHtml(state.adminContext.userId) + '" autocomplete="off" /></label><label>Organization ID<input name="organization_id" value="' + escapeHtml(state.adminContext.organizationId) + '" autocomplete="off" /></label><label class="span-2">Roles<input name="roles" value="' + escapeHtml(state.adminContext.roles || "super_admin") + '" autocomplete="off" /></label><div class="span-2 actions"><button class="button">Save admin access</button><button class="button secondary" type="button" data-action="clear-admin">Clear admin access</button></div></form></section></section></main>';
+      return '<main><div class="eyebrow">Configuration</div><h1>Connect Live API</h1><section class="grid-2"><section class="panel pad"><h2>Live API</h2><p>This page calls /api/health, /api/readiness, /api/trustpass, and /api/operational-proof from the connected host.</p><form id="api-form" class="form-grid"><label class="span-2">Live API base URL<input name="api_base_url" required value="' + escapeHtml(state.apiDraft || "") + '" placeholder="https://trustpass-api.onrender.com/api/v1" /></label><div class="span-2 actions"><button class="button">Save and test</button><button class="button secondary" type="button" data-action="clear-api">Clear</button></div></form></section><section class="panel pad"><h2>Supabase account</h2><p>Use a configured Supabase project to sign in or create a vendor or buyer workspace.</p><form id="auth-form" class="form-grid"><label class="span-2">Project URL<input name="project_url" type="url" value="' + escapeHtml(state.auth.projectUrl) + '" placeholder="https://project.supabase.co" /></label><label class="span-2">Publishable key<input name="publishable_key" value="' + escapeHtml(state.auth.publishableKey) + '" autocomplete="off" /></label><label>Email<input name="email" type="email" value="' + escapeHtml(state.auth.email) + '" autocomplete="email" /></label><label>Password<input name="password" type="password" autocomplete="current-password" /></label><label>Full name<input name="full_name" autocomplete="name" /></label><label>Organization type<select name="organization_type"><option value="vendor">Vendor</option><option value="buyer">Buyer</option></select></label><label class="span-2">Organization name<input name="organization_name" placeholder="Required for new accounts" /></label><div class="span-2 actions"><button class="button" type="button" data-auth-action="signin">Sign in</button><button class="button secondary" type="button" data-auth-action="signup">Create account</button><button class="button secondary" type="button" data-action="signout">Sign out</button></div></form></section><section class="panel pad"><h2>Admin Write Access</h2><p>Writes require an authorized TRUSTPASS admin context. Customer accounts use their own role-scoped API routes.</p><form id="admin-form" class="form-grid"><label class="span-2">Bearer token<input name="token" value="' + escapeHtml(state.adminContext.token) + '" autocomplete="off" placeholder="Supabase access token or TRUSTPASS admin subject" /></label><label>User ID<input name="user_id" value="' + escapeHtml(state.adminContext.userId) + '" autocomplete="off" /></label><label>Organization ID<input name="organization_id" value="' + escapeHtml(state.adminContext.organizationId) + '" autocomplete="off" /></label><label class="span-2">Roles<input name="roles" value="' + escapeHtml(state.adminContext.roles || "super_admin") + '" autocomplete="off" /></label><div class="span-2 actions"><button class="button">Save admin access</button><button class="button secondary" type="button" data-action="clear-admin">Clear admin access</button></div></form></section></section></main>';
     }
     const pages = {
       "/": statusPage,
@@ -454,6 +553,16 @@ const html = `<!doctype html>
     }
     document.addEventListener("click", async function (event) {
       const button = event.target.closest("[data-action]");
+      const authButton = event.target.closest("[data-auth-action]");
+      if (authButton) {
+        try {
+          await authenticate(authButton.getAttribute("data-auth-action"), document.getElementById("auth-form"));
+        } catch (error) {
+          state.error = error.message;
+          render();
+        }
+        return;
+      }
       if (!button) return;
       const action = button.getAttribute("data-action");
       if (action === "refresh") {
@@ -474,6 +583,9 @@ const html = `<!doctype html>
         state.adminContext = { token: "", userId: "", organizationId: "", roles: "super_admin" };
         state.error = "";
         render();
+      }
+      if (action === "signout") {
+        signOut();
       }
     });
     document.addEventListener("submit", async function (event) {

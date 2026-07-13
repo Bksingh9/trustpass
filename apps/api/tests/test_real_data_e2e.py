@@ -77,6 +77,31 @@ def test_real_data_workflow_persists_and_logs() -> None:
         roles="super_admin",
     )
 
+    onboarding_response = client.post(
+        "/api/v1/orgs/",
+        json={
+            "name": f"E2E Buyer {uuid4().hex[:8]}",
+            "type": "buyer",
+            "email": f"e2e-{uuid4().hex[:8]}@trustpass.local",
+            "full_name": "E2E Buyer Owner",
+        },
+        headers={"authorization": "Bearer real-data-onboarding-subject"},
+    )
+    assert onboarding_response.status_code == 201
+    onboarding_user_id = onboarding_response.json()["data"]["user"]["id"]
+    onboarding_org_id = onboarding_response.json()["data"]["organization"]["id"]
+    memberships_response = client.get(
+        "/api/v1/orgs/memberships",
+        headers={
+            "authorization": "Bearer real-data-onboarding-subject",
+            "x-trustpass-user-id": onboarding_user_id,
+            "x-trustpass-organization-id": onboarding_org_id,
+            "x-trustpass-roles": "buyer",
+        },
+    )
+    assert memberships_response.status_code == 200
+    assert memberships_response.json()["data"]["memberships"][0]["organization_id"] == onboarding_org_id
+
     health_response = client.get("/api/v1/health")
     assert health_response.status_code == 200
     assert health_response.headers["x-request-id"]
@@ -150,6 +175,65 @@ def test_real_data_workflow_persists_and_logs() -> None:
     )
     assert decision_response.status_code == 200
     assert decision_response.json()["data"]["status"] == "approved"
+
+    upload_response = client.post(
+        "/api/v1/documents/upload",
+        data={"document_type_id": str(document_type.id), "expires_at": "2027-01-31"},
+        files={"file": ("clearpath-upload-e2e.pdf", b"real uploaded bytes", "application/pdf")},
+        headers=vendor_headers,
+    )
+    assert upload_response.status_code == 201
+    uploaded_document_id = upload_response.json()["data"]["id"]
+    assert upload_response.json()["data"]["checksum_sha256"]
+
+    download_response = client.get(
+        f"/api/v1/documents/{uploaded_document_id}/download",
+        headers=vendor_headers,
+    )
+    assert download_response.status_code == 200
+    assert download_response.json()["data"]["signed_url"].startswith("local://")
+
+    checkout_response = client.post(
+        "/api/v1/billing/checkout",
+        json={"plan_code": "vendor_growth"},
+        headers=vendor_headers,
+    )
+    assert checkout_response.status_code == 201
+    checkout = checkout_response.json()["data"]
+    assert checkout["status"] == "pending"
+
+    webhook_response = client.post(
+        "/api/v1/billing/webhooks/mock",
+        json={
+            "event_id": f"real-data-e2e-{uuid4().hex}",
+            "organization_id": str(clearpath_org.id),
+            "payment_type": "subscription",
+            "status": "succeeded",
+            "amount_cents": 7900,
+            "currency": "USD",
+            "provider_payment_id": f"{checkout['external_id']}:payment",
+            "subscription_id": checkout["subscription_id"],
+            "subscription_status": "active",
+        },
+    )
+    assert webhook_response.status_code == 200
+    assert webhook_response.json()["data"]["status"] == "succeeded"
+
+    subscription_response = client.get("/api/v1/billing/subscription", headers=vendor_headers)
+    assert subscription_response.status_code == 200
+    assert subscription_response.json()["data"]["subscription"]["status"] == "active"
+
+    notifications_response = client.get("/api/v1/notifications/", headers=vendor_headers)
+    assert notifications_response.status_code == 200
+    notifications = notifications_response.json()["data"]["notifications"]
+    assert notifications
+    notification_id = notifications[0]["id"]
+    read_response = client.post(
+        f"/api/v1/notifications/{notification_id}/read",
+        headers=vendor_headers,
+    )
+    assert read_response.status_code == 200
+    assert read_response.json()["data"]["status"] == "read"
 
     audit_response = client.get(
         "/api/v1/audit/events",

@@ -11,6 +11,7 @@ from app.models.document import Document, DocumentType
 from app.models.enums import AuditAction, DocumentStatus
 from app.schemas.document import DocumentCreate, DocumentReview
 from app.services.audit import record_activity, record_audit_event
+from app.services.storage import StoredObject
 
 ALLOWED_MIME_TYPES = {"application/pdf", "image/png", "image/jpg", "image/jpeg"}
 
@@ -45,6 +46,7 @@ def create_document(
     organization_id: UUID,
     actor_user_id: UUID,
     payload: DocumentCreate,
+    stored_object: StoredObject | None = None,
 ) -> Document:
     document_type = db.get(DocumentType, payload.document_type_id)
     if document_type is None or not document_type.is_active:
@@ -56,17 +58,26 @@ def create_document(
         raise TrustPassError("File exceeds maximum size", "file_too_large", 400)
 
     safe_file_name = payload.file_name.replace("/", "_").replace("\\", "_")
+    storage_provider = stored_object.provider if stored_object else "local"
+    storage_bucket = stored_object.bucket if stored_object else None
+    storage_object_key = stored_object.object_key if stored_object else payload.storage_object_key
+    checksum_sha256 = (
+        (stored_object.checksum_sha256 or payload.checksum_sha256)
+        if stored_object
+        else payload.checksum_sha256
+    )
     document = Document(
         organization_id=organization_id,
         document_type_id=payload.document_type_id,
         uploaded_by_user_id=actor_user_id,
         file_name=payload.file_name,
         safe_file_name=safe_file_name,
-        storage_provider="local",
-        storage_object_key=payload.storage_object_key,
+        storage_provider=storage_provider,
+        storage_bucket=storage_bucket,
+        storage_object_key=storage_object_key,
         mime_type=payload.mime_type,
-        file_size_bytes=payload.file_size_bytes,
-        checksum_sha256=payload.checksum_sha256,
+        file_size_bytes=stored_object.size_bytes if stored_object else payload.file_size_bytes,
+        checksum_sha256=checksum_sha256,
         status=DocumentStatus.uploaded,
         issued_at=payload.issued_at,
         expires_at=payload.expires_at,
@@ -137,4 +148,3 @@ def review_document(
     db.commit()
     db.refresh(document)
     return document
-

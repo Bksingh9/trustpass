@@ -22,6 +22,15 @@ class UserContext:
     roles: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class AuthSubject:
+    """Identity verified by the configured external auth provider."""
+
+    auth_subject_id: str
+    email: str | None = None
+    full_name: str | None = None
+
+
 def _bearer_token(authorization: str | None) -> str:
     if not authorization:
         raise HTTPException(
@@ -134,7 +143,7 @@ def _context_from_memberships(
     )
 
 
-async def _verify_supabase_auth_subject(settings: Settings, token: str) -> str:
+async def _verify_supabase_auth_subject(settings: Settings, token: str) -> AuthSubject:
     if not settings.supabase_project_url or not settings.supabase_publishable_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -177,7 +186,29 @@ async def _verify_supabase_auth_subject(settings: Settings, token: str) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Supabase auth response",
         )
-    return str(auth_subject_id)
+    user_metadata = payload.get("user_metadata") or {}
+    full_name = user_metadata.get("full_name") or user_metadata.get("name")
+    return AuthSubject(
+        auth_subject_id=str(auth_subject_id),
+        email=str(payload["email"]) if payload.get("email") else None,
+        full_name=str(full_name) if full_name else None,
+    )
+
+
+async def get_auth_subject(
+    authorization: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+) -> AuthSubject:
+    """Validate a bearer token without requiring a pre-existing app user."""
+    token = _bearer_token(authorization)
+    if _resolve_auth_mode(settings) == "development_headers":
+        return AuthSubject(auth_subject_id=token)
+    if _resolve_auth_mode(settings) == "supabase_jwt":
+        return await _verify_supabase_auth_subject(settings, token)
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Unsupported auth mode",
+    )
 
 
 async def get_user_context(
@@ -188,10 +219,10 @@ async def get_user_context(
     settings: Settings = Depends(get_settings),
     db: Session = Depends(get_db),
 ) -> UserContext:
-    token = _bearer_token(authorization)
     auth_mode = _resolve_auth_mode(settings)
 
     if auth_mode == "development_headers":
+        token = _bearer_token(authorization)
         return _development_header_context(
             token=token,
             user_id=x_trustpass_user_id,
@@ -200,10 +231,10 @@ async def get_user_context(
         )
 
     if auth_mode == "supabase_jwt":
-        auth_subject_id = await _verify_supabase_auth_subject(settings, token)
+        subject = await _verify_supabase_auth_subject(settings, _bearer_token(authorization))
         return _context_from_memberships(
             db,
-            auth_subject_id=auth_subject_id,
+            auth_subject_id=subject.auth_subject_id,
             requested_organization_id=x_trustpass_organization_id,
         )
 

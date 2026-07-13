@@ -26,6 +26,8 @@ services:
         sync: false
       - key: SEED_CONTEXT_TOKEN
         sync: false
+      - key: BILLING_WEBHOOK_SECRET
+        sync: false
       - key: CORS_ORIGINS
         value: '["https://bksingh9.github.io"]'
 
