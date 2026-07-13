@@ -14,6 +14,11 @@ const liveApiBaseUrl = (
   .replace(/\/$/, "");
 const buildSha = (process.env.GITHUB_SHA || "local-build").trim();
 
+const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TRUSTPASS">
+  <rect width="64" height="64" rx="12" fill="#147461" />
+  <path d="M16 18h32v8H36v22h-8V26H16z" fill="#fff" />
+</svg>`;
+
 rmSync(pagesRoot, { recursive: true, force: true });
 mkdirSync(pagesRoot, { recursive: true });
 
@@ -23,6 +28,7 @@ const html = `<!doctype html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="trustpass-build-sha" content="${buildSha}" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <title>TRUSTPASS</title>
   <style>
     :root {
@@ -533,5 +539,6 @@ const html = `<!doctype html>
 
 writeFileSync(path.join(pagesRoot, "index.html"), html);
 writeFileSync(path.join(pagesRoot, "404.html"), html);
+writeFileSync(path.join(pagesRoot, "favicon.svg"), faviconSvg);
 writeFileSync(path.join(pagesRoot, ".nojekyll"), "");
 console.log("GitHub Pages build written to " + pagesRoot);
