@@ -4,6 +4,8 @@ services:
     runtime: docker
     plan: free
     rootDir: apps/api
+    branch: main
+    autoDeploy: true
     healthCheckPath: /api/v1/readiness
     envVars:
       - key: ENVIRONMENT

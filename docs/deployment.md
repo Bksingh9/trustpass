@@ -103,6 +103,11 @@ public HTTPS API and a durable database. The preferred no-Cloudflare path is:
 - Verification: `.github/workflows/verify-deployed-api.yml` targets
   `https://trustpass-api.onrender.com` by default. Set repository variable
   `TRUSTPASS_API_BASE_URL` only when replacing that Render URL.
+- Automatic API rollout: `.github/workflows/deploy-render-api.yml` triggers a
+  Render deploy hook from `RENDER_DEPLOY_HOOK_URL` and waits for the deployed
+  OpenAPI contract to contain the authenticated onboarding, upload, billing,
+  and notification routes. Without that repository secret, the workflow
+  reports the deployment as not configured rather than claiming success.
 
 This proof uses production routes, not `/api/v1/demo/*`, and verifies
 health/readiness, buyer-safe search, shortlist persistence, buyer request

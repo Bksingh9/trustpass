@@ -1,0 +1,59 @@
+name: Deploy TRUSTPASS Render API
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Trigger Render deploy
+    runs-on: ubuntu-latest
+    env:
+      API_BASE_URL: ${{ vars.TRUSTPASS_API_BASE_URL || 'https://trustpass-api.onrender.com' }}
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+    steps:
+      - name: Explain skipped deployment
+        if: ${{ env.RENDER_DEPLOY_HOOK_URL == '' }}
+        run: |
+          echo "RENDER_DEPLOY_HOOK_URL is not configured; no Render deploy was triggered."
+          echo "Set the repository secret to enable automatic API deployment verification."
+
+      - name: Trigger Render deploy hook
+        if: ${{ env.RENDER_DEPLOY_HOOK_URL != '' }}
+        run: curl --fail --silent --show-error --request POST --url "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Wait for deployed API contract
+        if: ${{ env.RENDER_DEPLOY_HOOK_URL != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error "$API_BASE_URL/api/v1/openapi.json" -o openapi.json; then
+              python - <<'PY'
+          import json
+
+          document = json.load(open("openapi.json", encoding="utf-8"))
+          paths = document.get("paths", {})
+          required = {
+              "/api/v1/orgs/",
+              "/api/v1/documents/upload",
+              "/api/v1/billing/checkout",
+              "/api/v1/billing/webhooks/{provider}",
+              "/api/v1/notifications/{notification_id}/read",
+          }
+          missing = sorted(required - set(paths))
+          if missing:
+              raise SystemExit(f"Render is healthy but serving an older API revision; missing: {missing}")
+          print("RENDER_API_CONTRACT_OK")
+          PY
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Render API did not expose the expected OpenAPI contract in time." >&2
+          exit 1
