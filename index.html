@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="trustpass-build-sha" content="2969fb07b8c6293f0bfad8e8d37b8f71dfb47fda" />
+  <meta name="trustpass-build-sha" content="0badb088157cd0c49f5683e31da5ed7acc82ed26" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <title>TRUSTPASS</title>
   <style>
@@ -540,6 +540,7 @@
     function workspaceNotice() {
       if (state.workspace.loading) return '<span class="api-pill">Loading workspace</span>';
       if (state.workspace.error) return '<span class="api-pill error">' + escapeHtml(state.workspace.error) + '</span>';
+      if (!hasAuthContext()) return '<span class="api-pill">Sign in required</span>';
       return '<span class="api-pill connected">Workspace connected</span>';
     }
     function workspaceRows(rows, emptyText, renderRow, columns) {
@@ -839,7 +840,7 @@
         await postTrustpass("add_document", form);
         event.target.reset();
       }
-      if (event.target.id === "buyer-request-form") {
+      if (event.target.id === "buyer-request-form" && currentRoute().path !== "/workspace") {
         event.preventDefault();
         const form = Object.fromEntries(new FormData(event.target).entries());
         await postTrustpass("create_buyer_request", form);
@@ -852,9 +853,13 @@
         event.target.reset();
       }
     });
-    addEventListener("hashchange", render);
+    addEventListener("hashchange", function () {
+      render();
+      if (currentRoute().path === "/workspace") refreshWorkspace();
+    });
     render();
     refreshLiveData();
+    if (currentRoute().path === "/workspace") refreshWorkspace();
   </script>
 </body>
 </html>
