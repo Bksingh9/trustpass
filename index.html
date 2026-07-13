@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="trustpass-build-sha" content="c47dc56bb64271e9efa7b4561055bfb1be453619" />
+  <meta name="trustpass-build-sha" content="d6a4b11b105be571ed7194a1c4d61b99620c216d" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <title>TRUSTPASS</title>
   <style>
@@ -354,7 +354,7 @@
     }
     async function authenticate(mode, form) {
       const values = Object.fromEntries(new FormData(form).entries());
-      const projectUrl = String(values.project_url || "").trim().replace(//$/, "");
+      const projectUrl = String(values.project_url || "").trim().replace(/\/$/, "");
       const publishableKey = String(values.publishable_key || "").trim();
       const email = String(values.email || "").trim();
       const password = String(values.password || "");
