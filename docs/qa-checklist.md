@@ -14,8 +14,10 @@
 ## Repository Security
 
 - `SECURITY.md`, `LICENSE`, and `CONTRIBUTING.md` are present.
+- `CODE_OF_CONDUCT.md` is present for public contributor expectations.
 - Dependabot covers GitHub Actions, API Python dependencies, and Node app dependencies.
 - CodeQL runs for Python and JavaScript/TypeScript on pushes, pull requests, weekly schedule, and manual dispatch.
+- OpenSSF Scorecard runs on public-repo changes and uploads SARIF security results.
 - Code scanning uploads security events successfully on the public repository.
 
 ## Vendor Flow
