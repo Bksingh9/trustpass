@@ -378,7 +378,7 @@ const html = `<!doctype html>
     }
     async function authenticate(mode, form) {
       const values = Object.fromEntries(new FormData(form).entries());
-      const projectUrl = String(values.project_url || "").trim().replace(/\/$/, "");
+      const projectUrl = String(values.project_url || "").trim().replace(/\\/$/, "");
       const publishableKey = String(values.publishable_key || "").trim();
       const email = String(values.email || "").trim();
       const password = String(values.password || "");
