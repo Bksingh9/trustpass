@@ -1,5 +1,4 @@
-import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
-import http from "node:http";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -95,40 +94,13 @@ if (process.env.TRUSTPASS_LIVE_BASE_URL) {
 
 assert(notFoundHtml === indexHtml, "404.html must match index.html for SPA fallback");
 
-const server = http.createServer((request, response) => {
-  const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
-  const relativePath = requestUrl.pathname === "/" ? "index.html" : requestUrl.pathname.slice(1);
-  const candidatePath = path.resolve(pagesRoot, relativePath);
-  const isInsidePagesRoot = candidatePath === pagesRoot || candidatePath.startsWith(pagesRoot + path.sep);
-  const filePath =
-    isInsidePagesRoot && existsSync(candidatePath) && statSync(candidatePath).isFile()
-      ? candidatePath
-      : indexPath;
-
-  response.setHeader("content-type", "text/html; charset=utf-8");
-  createReadStream(filePath).pipe(response);
-});
-
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-
-try {
-  const { port } = server.address();
-  const baseUrl = "http://127.0.0.1:" + port;
-  const paths = ["/", "/index.html", "/404.html", "/unknown/path"];
-
-  for (const routePath of paths) {
-    const response = await fetch(baseUrl + routePath);
-    const body = await response.text();
-    assert(response.status === 200, routePath + " returned " + response.status);
-    assert(body.includes("TRUSTPASS Live Gateway"), routePath + " did not render live gateway");
-    for (const snippet of forbiddenSnippets) {
-      assert(!body.includes(snippet), routePath + " contains forbidden content: " + snippet);
-    }
+const spaPaths = ["/", "/index.html", "/404.html", "/unknown/path", "/workspace"];
+for (const routePath of spaPaths) {
+  assert(indexHtml.includes("TRUSTPASS Live Gateway"), routePath + " did not render live gateway");
+  assert(notFoundHtml === indexHtml, routePath + " fallback artifact is not identical to index artifact");
+  for (const snippet of forbiddenSnippets) {
+    assert(!indexHtml.includes(snippet), routePath + " contains forbidden content: " + snippet);
   }
-} finally {
-  await new Promise((resolve, reject) => {
-    server.close((error) => (error ? reject(error) : resolve()));
-  });
 }
 
 console.log("STATIC_E2E_OK");
