@@ -113,6 +113,24 @@ def test_auth_mode_can_explicitly_allow_development_headers_for_demo_proof() -> 
     assert _resolve_auth_mode(settings) == "development_headers"
 
 
+def test_production_supabase_auth_requires_real_project_configuration() -> None:
+    with pytest.raises(RuntimeError, match="SUPABASE_PROJECT_URL"):
+        validate_auth_configuration(Settings(environment="production", auth_mode="supabase_jwt"))
+
+
+def test_production_s3_storage_requires_real_bucket_configuration() -> None:
+    settings = Settings(
+        environment="production",
+        auth_mode="supabase_jwt",
+        supabase_project_url="https://example.supabase.co",
+        supabase_publishable_key="publishable-key",
+        storage_provider="s3",
+    )
+
+    with pytest.raises(RuntimeError, match="S3_BUCKET"):
+        validate_auth_configuration(settings)
+
+
 def test_production_development_headers_require_explicit_synthetic_proof_mode() -> None:
     with pytest.raises(RuntimeError, match="ALLOW_SYNTHETIC_PROOF_DATA"):
         validate_auth_configuration(Settings(environment="production", auth_mode="development_headers"))
@@ -343,4 +361,3 @@ def test_seed_context_remains_available_for_local_development() -> None:
     settings = Settings(environment="local", seed_context_token=None)
 
     _authorize_seed_context(settings, None)
-

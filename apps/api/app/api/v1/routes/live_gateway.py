@@ -400,6 +400,12 @@ def _live_state(db: Session, request_id: str) -> dict:
 
 
 def _public_state(db: Session, request_id: str) -> dict:
+    # Public reads must never surface seed, QA, or proof-only organizations.
+    non_synthetic_name_filters = [
+        Organization.name.notin_(SEEDED_SYNTHETIC_ORG_NAMES),
+        *[~Organization.name.startswith(prefix) for prefix in QA_RECORD_PREFIXES],
+        *[~Organization.name.contains(token) for token in QA_RECORD_TOKENS],
+    ]
     vendor_rows = db.execute(
         select(Organization, VendorProfile)
         .join(VendorProfile, VendorProfile.organization_id == Organization.id)
@@ -408,6 +414,7 @@ def _public_state(db: Session, request_id: str) -> dict:
             Organization.status == "active",
             Organization.deleted_at.is_(None),
             VendorProfile.public_profile_enabled.is_(True),
+            *non_synthetic_name_filters,
         )
         .order_by(desc(VendorProfile.current_trust_score), Organization.name.asc())
         .limit(50)
@@ -764,4 +771,3 @@ async def write_trustpass(
 
     db.commit()
     return _state_response(db, request_id, status_code=201, public_only=False)
-
