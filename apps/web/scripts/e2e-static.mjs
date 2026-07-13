@@ -79,6 +79,15 @@ function assert(condition, message) {
   }
 }
 
+const scriptStart = indexHtml.indexOf("<script>");
+const scriptEnd = indexHtml.indexOf("</script>", scriptStart);
+assert(scriptStart >= 0 && scriptEnd > scriptStart, "Static artifact is missing its browser script");
+try {
+  new Function(indexHtml.slice(scriptStart + "<script>".length, scriptEnd));
+} catch (error) {
+  throw new Error("Generated Pages browser script is invalid: " + error.message);
+}
+
 for (const snippet of requiredSnippets) {
   assert(indexHtml.includes(snippet), "Missing static content: " + snippet);
 }
@@ -104,4 +113,3 @@ for (const routePath of spaPaths) {
 }
 
 console.log("STATIC_E2E_OK");
-
