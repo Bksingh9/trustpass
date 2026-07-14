@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload local D1 proof
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trustpass-local-d1-live-proof
           path: apps/live/live-e2e-proof-local.json
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload deployed live proof
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trustpass-deployed-live-proof
           path: apps/live/live-e2e-proof-deployed.json

@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload live API proof
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trustpass-live-url-api-proof
           path: apps/live/live-url-e2e-proof.json
@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload public gateway proof
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trustpass-live-url-public-gateway-proof
           path: apps/web/public-gateway-live-url-proof.json
