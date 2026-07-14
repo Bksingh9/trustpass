@@ -61,7 +61,7 @@ jobs:
       TRUSTPASS_REAL_ROLE: ${{ vars.TRUSTPASS_REAL_ROLE || '' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python
         uses: actions/setup-python@v5
