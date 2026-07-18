@@ -32,7 +32,7 @@
     "eslint": "10.7.0",
     "eslint-config-next": "16.2.10",
     "react-server-dom-webpack": "19.2.7",
-    "tailwindcss": "4.3.2",
+    "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vinext": "1.0.0-beta.1",
     "vite": "8.1.4",
